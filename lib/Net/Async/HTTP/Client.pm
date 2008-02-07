@@ -210,7 +210,9 @@ sub do_request_handle
 
    $loop->add( $conn );
 
-   $conn->write( $req->as_string );
+   # HTTP::Request is silly and uses "\n" as a separator. We must tell it to
+   # use the correct RFC 2616-compliant CRLF sequence.
+   $conn->write( $req->as_string( $CRLF ) );
 }
 
 # Keep perl happy; keep Britain tidy
