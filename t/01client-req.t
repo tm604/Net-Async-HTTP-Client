@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 22;
+use Test::More tests => 27;
 use IO::Async::Test;
 use IO::Async::Loop::IO_Poll;
 use IO::Async::Stream;
@@ -190,5 +190,34 @@ do_test_req( "GET not found",
       'Content-Type'   => "text/plain",
    },
    expect_res_content => "",
+);
+
+$req = HTTP::Request->new( GET => "/stream", [ Host => "somewhere" ] );
+$req->protocol( "HTTP/1.1" );
+
+do_test_req( "GET chunks",
+   req => $req,
+
+   expect_req_firstline => "GET /stream HTTP/1.1",
+   expect_req_headers => {
+      Host => "somewhere",
+   },
+
+   response => "HTTP/1.1 200 OK$CRLF" . 
+               "Content-Length: 13$CRLF" .
+               "Content-Type: text/plain$CRLF" .
+               "Transfer-Encoding: chunked$CRLF" .
+               $CRLF .
+               "7$CRLF" . "Hello, " .
+               "6$CRLF" . "world!" .
+               "0$CRLF",
+
+   expect_res_code    => 200,
+   expect_res_headers => {
+      'Content-Length' => 13,
+      'Content-Type'   => "text/plain",
+      'Transfer-Encoding' => "chunked",
+   },
+   expect_res_content => "Hello, world!",
 );
 
