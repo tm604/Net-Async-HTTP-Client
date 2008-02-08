@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 32;
+use Test::More tests => 38;
 use IO::Async::Test;
 use IO::Async::Loop::IO_Poll;
 use IO::Async::Stream;
@@ -69,6 +69,7 @@ sub do_test_req
    is_deeply( \%req_headers, $args{expect_req_headers}, "Request headers for $name" );
 
    $otherend->write( $args{response} );
+   $otherend->close if $args{close_after_response};
 
    # Wait for the Client to finish its response
    wait_for { defined $response or defined $error };
@@ -225,5 +226,29 @@ do_test_req( "GET chunks",
       'Transfer-Encoding' => "chunked",
    },
    expect_res_content => "Hello, world!",
+);
+
+$req = HTTP::Request->new( GET => "/untileof", [ Host => "somewhere" ] );
+$req->protocol( "HTTP/1.1" );
+
+do_test_req( "GET unspecified length",
+   req => $req,
+
+   expect_req_firstline => "GET /untileof HTTP/1.1",
+   expect_req_headers => {
+      Host => "somewhere",
+   },
+
+   response => "HTTP/1.1 200 OK$CRLF" . 
+               "Content-Type: text/plain$CRLF" .
+               $CRLF .
+               "Some more content here",
+   close_after_response => 1,
+
+   expect_res_code    => 200,
+   expect_res_headers => {
+      'Content-Type'   => "text/plain",
+   },
+   expect_res_content => "Some more content here",
 );
 
