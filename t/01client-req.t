@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 27;
+use Test::More tests => 32;
 use IO::Async::Test;
 use IO::Async::Loop::IO_Poll;
 use IO::Async::Stream;
@@ -74,8 +74,14 @@ sub do_test_req
    wait_for { defined $response or defined $error };
 
    if( $args{expect_error} ) {
-      ok( 1, "Expected error for $name" );
+      ok( defined $error, "Expected error for $name" );
       return;
+   }
+   else {
+      ok( !defined $error, "Failed to error for $name" );
+      if( defined $error ) {
+         diag( "Got error $error" );
+      }
    }
 
    if( exists $args{expect_res_code} ) {
