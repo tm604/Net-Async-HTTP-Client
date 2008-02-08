@@ -43,9 +43,6 @@ sub do_request
    if( $args{request} ) {
       $request = delete $args{request};
       ref $request and $request->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
-
-      $host = delete $args{host} or croak "Expected 'host'";
-      $port = delete $args{port} or croak "Expected 'port'";
    }
    elsif( $args{uri} ) {
       my $uri = delete $args{uri};
@@ -64,30 +61,47 @@ sub do_request
       $request->header( Host => $host );
    }
 
-   my $loop = $self->{loop};
+   if( $args{handle} ) {
+      $self->do_request_handle(
+         %args,
+         request => $request,
+         handle  => $args{handle},
+      );
+   }
+   else {
+      my $loop = $self->{loop};
 
-   $loop->connect(
-      host     => $host,
-      service  => $port,
-      socktype => SOCK_STREAM,
-
-      on_resolve_error => sub {
-         $on_error->( "$host:$port not resolvable [$_[0]]" );
-      },
-
-      on_connect_error => sub {
-         $on_error->( "$host:$port not contactable" );
-      },
-
-      on_connected => sub {
-         my ( $sock ) = @_;
-         $self->do_request_handle(
-            %args,
-            request => $request,
-            handle  => $sock,
-         );
+      if( !defined $host ) {
+         $host = delete $args{host} or croak "Expected 'host'";
       }
-   );
+
+      if( !defined $port ) {
+         $port = delete $args{port} or croak "Expected 'port'";
+      }
+
+      $loop->connect(
+         host     => $host,
+         service  => $port,
+         socktype => SOCK_STREAM,
+
+         on_resolve_error => sub {
+            $on_error->( "$host:$port not resolvable [$_[0]]" );
+         },
+
+         on_connect_error => sub {
+            $on_error->( "$host:$port not contactable" );
+         },
+
+         on_connected => sub {
+            my ( $sock ) = @_;
+            $self->do_request_handle(
+               %args,
+               request => $request,
+               handle  => $sock,
+            );
+         }
+      );
+   }
 }
 
 sub do_request_handle

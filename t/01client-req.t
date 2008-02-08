@@ -35,7 +35,7 @@ sub do_test_req
    my $response;
    my $error;
 
-   $client->do_request_handle(
+   $client->do_request(
       request => $args{req},
       handle  => $S1,
 
