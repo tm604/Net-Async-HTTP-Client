@@ -60,6 +60,8 @@ sub do_request
       $request->protocol( "HTTP/1.1" );
       $request->header( Host => $host );
 
+      $request->content( $args{content} ) if defined $args{content};
+
       my ( $user, $pass );
 
       if( defined $uri->userinfo ) {
@@ -230,6 +232,10 @@ sub do_request_handle
          };
       }
    };
+
+   if( $method eq "POST" or $method eq "PUT" or length $req->content ) {
+      $req->init_header( "Content-Length", length $req->content );
+   }
 
    my $loop = $self->{loop};
 

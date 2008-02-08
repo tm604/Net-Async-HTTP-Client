@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 30;
+use Test::More tests => 37;
 use IO::Async::Test;
 use IO::Async::Loop::IO_Poll;
 use IO::Async::Stream;
@@ -35,11 +35,12 @@ sub do_test_uri
    my $error;
 
    $client->do_request(
-      uri    => $args{uri},
-      method => $args{method},
-      user   => $args{user},
-      pass   => $args{pass},
-      handle => $S1,
+      uri     => $args{uri},
+      method  => $args{method},
+      user    => $args{user},
+      pass    => $args{pass},
+      content => $args{content},
+      handle  => $S1,
 
       on_response => sub { $response = $_[0] },
       on_error    => sub { $error    = $_[0] },
@@ -66,9 +67,22 @@ sub do_test_uri
 
    is( $req_firstline, $args{expect_req_firstline}, "First line for $name" );
 
-   my %req_headers = map { m/^(.*?):\s+(.*)$/g } split( m/$CRLF/, $request_stream );
+   $request_stream =~ s/^(.*)$CRLF$CRLF//s;
+   my %req_headers = map { m/^(.*?):\s+(.*)$/g } split( m/$CRLF/, $1 );
+
+   my $req_content;
+   if( defined( my $len = $req_headers{'Content-Length'} ) ) {
+      wait_for { length( $request_stream ) >= $len };
+
+      $req_content = substr( $request_stream, 0, $len );
+      substr( $request_stream, 0, $len ) = "";
+   }
 
    is_deeply( \%req_headers, $args{expect_req_headers}, "Request headers for $name" );
+
+   if( defined $args{expect_req_content} ) {
+      is( $req_content, $args{expect_req_content}, "Request content for $name" );
+   }
 
    $otherend->write( $args{response} );
    $otherend->close if $args{close_after_response};
@@ -218,5 +232,31 @@ do_test_uri( "authenticated GET (URL embedded)",
       'Content-Type'   => "text/plain",
    },
    expect_res_content => "Shhhh!",
+);
+
+do_test_uri( "simple POST",
+   method  => "POST",
+   uri     => URI->new( "http://somewhere/handler" ),
+   content => "New content",
+
+   expect_req_firstline => "POST /handler HTTP/1.1",
+   expect_req_headers => {
+      Host => "somewhere",
+      'Content-Length' => 11,
+   },
+   expect_req_content => "New content",
+
+   response => "HTTP/1.1 201 Created$CRLF" . 
+               "Content-Length: 11$CRLF" .
+               "Content-Type: text/plain$CRLF" .
+               $CRLF .
+               "New content",
+
+   expect_res_code    => 201,
+   expect_res_headers => {
+      'Content-Length' => 11,
+      'Content-Type'   => "text/plain",
+   },
+   expect_res_content => "New content",
 );
 
