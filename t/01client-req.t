@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 17;
+use Test::More tests => 22;
 use IO::Async::Test;
 use IO::Async::Loop::IO_Poll;
 use IO::Async::Stream;
@@ -142,6 +142,30 @@ do_test_req( "simple GET",
       'Content-Type'   => "text/plain",
    },
    expect_res_content => "Hello, world!",
+);
+
+$req = HTTP::Request->new( GET => "/empty", [ Host => "myhost" ] );
+$req->protocol( "HTTP/1.1" );
+
+do_test_req( "GET with empty body",
+   req => $req,
+
+   expect_req_firstline => "GET /empty HTTP/1.1",
+   expect_req_headers => {
+      Host => "myhost",
+   },
+
+   response => "HTTP/1.1 200 OK$CRLF" . 
+               "Content-Length: 0$CRLF" . 
+               "Content-Type: text/plain$CRLF" .
+               $CRLF,
+
+   expect_res_code    => 200,
+   expect_res_headers => {
+      'Content-Length' => 0,
+      'Content-Type'   => "text/plain",
+   },
+   expect_res_content => "",
 );
 
 $req = HTTP::Request->new( GET => "/somethingmissing", [ Host => "somewhere" ] );

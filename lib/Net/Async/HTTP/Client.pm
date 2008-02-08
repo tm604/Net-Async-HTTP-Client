@@ -166,6 +166,12 @@ sub do_request_handle
          };
       }
       elsif( defined $content_length ) {
+         if( $content_length == 0 ) {
+            $on_response->( $response );
+            $conn->close;
+            return 0;
+         }
+
          $on_read = sub {
             my ( $conn, $buffref, $closed ) = @_;
 
