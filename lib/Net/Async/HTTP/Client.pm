@@ -133,7 +133,7 @@ sub do_request_handle
       }
 
       my $transfer_encoding = $response->header( "Transfer-Encoding" );
-      my $content_length = $response->header( "Content-Length" );
+      my $content_length = $response->content_length;
 
       if( defined $transfer_encoding and $transfer_encoding eq "chunked" ) {
          my $chunk_length;
