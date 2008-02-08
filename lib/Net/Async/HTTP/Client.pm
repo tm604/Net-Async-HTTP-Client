@@ -27,35 +27,6 @@ sub new
    return $self;
 }
 
-sub do_uri
-{
-   my $self = shift;
-   my %args = @_;
-
-   my $on_response = $args{on_response} or croak "Expected 'on_response' as a CODE ref";
-   my $on_error    = $args{on_error}    or croak "Expected 'on_error' as a CODE ref";
-
-   my $uri    = $args{uri} or croak "Expected 'uri'";
-   my $method = $args{method} || "GET";
-
-   my $host = $uri->host;
-   my $port = $uri->port;
-   my $path = $uri->path;
-
-   $path = "/" if $path eq "";
-
-   my $req = HTTP::Request->new( $method, $path );
-   $req->protocol( "HTTP/1.1" );
-   $req->header( Host => $host );
-
-   $self->do_request(
-      %args,
-      request => $req,
-      host    => $host,
-      port    => $port,
-   );
-}
-
 sub do_request
 {
    my $self = shift;
@@ -64,11 +35,34 @@ sub do_request
    my $on_response = $args{on_response} or croak "Expected 'on_response' as a CODE ref";
    my $on_error    = $args{on_error}    or croak "Expected 'on_error' as a CODE ref";
 
-   my $req = $args{request};
-   ref $req and $req->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
+   my $request;
 
-   my $host = $args{host} or croak "Expected 'host'";
-   my $port = $args{port} or croak "Expected 'port'";
+   my $host;
+   my $port;
+
+   if( $args{request} ) {
+      $request = delete $args{request};
+      ref $request and $request->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
+
+      $host = delete $args{host} or croak "Expected 'host'";
+      $port = delete $args{port} or croak "Expected 'port'";
+   }
+   elsif( $args{uri} ) {
+      my $uri = delete $args{uri};
+      ref $uri and $uri->isa( "URI" ) or croak "Expected 'uri' as a URI reference";
+
+      my $method = delete $args{method} || "GET";
+
+      $host = $uri->host;
+      $port = $uri->port;
+      my $path = $uri->path;
+
+      $path = "/" if $path eq "";
+
+      $request = HTTP::Request->new( $method, $path );
+      $request->protocol( "HTTP/1.1" );
+      $request->header( Host => $host );
+   }
 
    my $loop = $self->{loop};
 
@@ -89,6 +83,7 @@ sub do_request
          my ( $sock ) = @_;
          $self->do_request_handle(
             %args,
+            request => $request,
             handle  => $sock,
          );
       }
