@@ -52,7 +52,7 @@ sub do_request
 
       $host = $uri->host;
       $port = $uri->port;
-      my $path = $uri->path;
+      my $path = $uri->path_query;
 
       $path = "/" if $path eq "";
 

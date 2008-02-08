@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 12;
+use Test::More tests => 18;
 use IO::Async::Test;
 use IO::Async::Loop::IO_Poll;
 use IO::Async::Stream;
@@ -143,5 +143,28 @@ do_test_uri( "simple GET",
       'Content-Type'   => "text/plain",
    },
    expect_res_content => "Hello, world!",
+);
+
+do_test_uri( "GET with params",
+   method => "GET",
+   uri    => URI->new( "http://myhost/cgi?param=value" ),
+
+   expect_req_firstline => "GET /cgi?param=value HTTP/1.1",
+   expect_req_headers => {
+      Host => "myhost",
+   },
+
+   response => "HTTP/1.1 200 OK$CRLF" . 
+               "Content-Length: 11$CRLF" . 
+               "Content-Type: text/plain$CRLF" .
+               $CRLF . 
+               "CGI content",
+
+   expect_res_code    => 200,
+   expect_res_headers => {
+      'Content-Length' => 11,
+      'Content-Type'   => "text/plain",
+   },
+   expect_res_content => "CGI content",
 );
 
