@@ -8,6 +8,7 @@ use Carp;
 
 use HTTP::Request;
 use HTTP::Response;
+use HTTP::Request::Common qw();
 
 use Socket qw( SOCK_STREAM );
 
@@ -56,11 +57,16 @@ sub do_request
 
       $path = "/" if $path eq "";
 
-      $request = HTTP::Request->new( $method, $path );
+      if( $method eq "POST" ) {
+         # This will automatically encode a form for us
+         $request = HTTP::Request::Common::POST( $path, Content => $args{content} );
+      }
+      else {
+         $request = HTTP::Request->new( $method, $path );
+      }
+
       $request->protocol( "HTTP/1.1" );
       $request->header( Host => $host );
-
-      $request->content( $args{content} ) if defined $args{content};
 
       my ( $user, $pass );
 

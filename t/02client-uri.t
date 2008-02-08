@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 37;
+use Test::More tests => 44;
 use IO::Async::Test;
 use IO::Async::Loop::IO_Poll;
 use IO::Async::Stream;
@@ -243,6 +243,7 @@ do_test_uri( "simple POST",
    expect_req_headers => {
       Host => "somewhere",
       'Content-Length' => 11,
+      'Content-Type' => "application/x-www-form-urlencoded",
    },
    expect_req_content => "New content",
 
@@ -258,5 +259,31 @@ do_test_uri( "simple POST",
       'Content-Type'   => "text/plain",
    },
    expect_res_content => "New content",
+);
+do_test_uri( "form POST",
+   method  => "POST",
+   uri     => URI->new( "http://somewhere/handler" ),
+   content => [ param => "value", another => "value with things" ],
+
+   expect_req_firstline => "POST /handler HTTP/1.1",
+   expect_req_headers => {
+      Host => "somewhere",
+      'Content-Length' => 37,
+      'Content-Type' => "application/x-www-form-urlencoded",
+   },
+   expect_req_content => "param=value&another=value+with+things",
+
+   response => "HTTP/1.1 200 OK$CRLF" . 
+               "Content-Length: 4$CRLF" .
+               "Content-Type: text/plain$CRLF" .
+               $CRLF .
+               "Done",
+
+   expect_res_code    => 200,
+   expect_res_headers => {
+      'Content-Length' => 4,
+      'Content-Type'   => "text/plain",
+   },
+   expect_res_content => "Done",
 );
 
