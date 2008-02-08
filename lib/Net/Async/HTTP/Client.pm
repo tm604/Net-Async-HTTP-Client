@@ -188,7 +188,7 @@ sub do_request_handle
                my $chunk = substr( $$buffref, 0, $chunk_length, "" );
                undef $chunk_length;
 
-               $response->content( $response->content . $chunk );
+               $response->add_content( $chunk );
 
                return 1;
             }
