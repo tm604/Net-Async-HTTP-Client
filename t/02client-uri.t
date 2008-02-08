@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 18;
+use Test::More tests => 30;
 use IO::Async::Test;
 use IO::Async::Loop::IO_Poll;
 use IO::Async::Stream;
@@ -37,6 +37,8 @@ sub do_test_uri
    $client->do_request(
       uri    => $args{uri},
       method => $args{method},
+      user   => $args{user},
+      pass   => $args{pass},
       handle => $S1,
 
       on_response => sub { $response = $_[0] },
@@ -166,5 +168,55 @@ do_test_uri( "GET with params",
       'Content-Type'   => "text/plain",
    },
    expect_res_content => "CGI content",
+);
+
+do_test_uri( "authenticated GET",
+   method => "GET",
+   uri    => URI->new( "http://myhost/secret" ),
+   user   => "user",
+   pass   => "pass",
+
+   expect_req_firstline => "GET /secret HTTP/1.1",
+   expect_req_headers => {
+      Host => "myhost",
+      Authorization => "Basic dXNlcjpwYXNz", # determined using 'wget'
+   },
+
+   response => "HTTP/1.1 200 OK$CRLF" . 
+               "Content-Length: 18$CRLF" . 
+               "Content-Type: text/plain$CRLF" .
+               $CRLF . 
+               "For your eyes only",
+
+   expect_res_code    => 200,
+   expect_res_headers => {
+      'Content-Length' => 18,
+      'Content-Type'   => "text/plain",
+   },
+   expect_res_content => "For your eyes only",
+);
+
+do_test_uri( "authenticated GET (URL embedded)",
+   method => "GET",
+   uri    => URI->new( "http://user:pass\@myhost/private" ),
+
+   expect_req_firstline => "GET /private HTTP/1.1",
+   expect_req_headers => {
+      Host => "myhost",
+      Authorization => "Basic dXNlcjpwYXNz", # determined using 'wget'
+   },
+
+   response => "HTTP/1.1 200 OK$CRLF" . 
+               "Content-Length: 6$CRLF" . 
+               "Content-Type: text/plain$CRLF" .
+               $CRLF . 
+               "Shhhh!",
+
+   expect_res_code    => 200,
+   expect_res_headers => {
+      'Content-Length' => 6,
+      'Content-Type'   => "text/plain",
+   },
+   expect_res_content => "Shhhh!",
 );
 

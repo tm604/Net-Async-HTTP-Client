@@ -59,6 +59,20 @@ sub do_request
       $request = HTTP::Request->new( $method, $path );
       $request->protocol( "HTTP/1.1" );
       $request->header( Host => $host );
+
+      my ( $user, $pass );
+
+      if( defined $uri->userinfo ) {
+         ( $user, $pass ) = split( m/:/, $uri->userinfo, 2 );
+      }
+      elsif( defined $args{user} and defined $args{pass} ) {
+         $user = $args{user};
+         $pass = $args{pass};
+      }
+
+      if( defined $user and defined $pass ) {
+         $request->authorization_basic( $user, $pass );
+      }
    }
 
    if( $args{handle} ) {
