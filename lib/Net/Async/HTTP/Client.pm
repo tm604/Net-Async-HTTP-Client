@@ -125,8 +125,9 @@ sub do_request_handle
 
       my $code = $response->code;
 
-      # Only '200' has a body, and not when requested with 'HEAD'
-      if( $code != 200 or $method eq "HEAD" ) {
+      # RFC 2616 says "HEAD" does not have a body, nor do any 1xx codes, nor
+      # 204 (No Content) nor 304 (Not Modified)
+      if( $method eq "HEAD" or $code =~ m/^1..$/ or $code eq "204" or $code eq "304" ) {
          $on_response->( $response );
          $conn->close;
          return 0;

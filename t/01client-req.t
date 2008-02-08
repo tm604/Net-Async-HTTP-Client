@@ -180,10 +180,14 @@ do_test_req( "GET not found",
    },
 
    response => "HTTP/1.1 404 Not Found$CRLF" . 
+               "Content-Length: 0$CRLF" .
+               "Content-Type: text/plain$CRLF" .
                $CRLF,
 
    expect_res_code    => 404,
    expect_res_headers => {
+      'Content-Length' => 0,
+      'Content-Type'   => "text/plain",
    },
    expect_res_content => "",
 );
