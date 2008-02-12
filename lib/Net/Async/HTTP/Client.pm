@@ -102,8 +102,8 @@ sub do_request
       }
 
       $loop->connect(
-         host     => $host,
-         service  => $port,
+         host     => $args{proxy_host} || $host,
+         service  => $args{proxy_port} || $port,
          socktype => SOCK_STREAM,
 
          on_resolve_error => sub {
