@@ -147,7 +147,7 @@ sub do_request_handle
       my ( $conn, $buffref, $closed ) = @_;
 
       unless( $$buffref =~ s/^(.*?$CRLF$CRLF)//s ) {
-         $on_error->( 0, "Connection closed while awaiting header" ) if $closed;
+         $on_error->( "Connection closed while awaiting header" ) if $closed;
          return 0;
       }
 
