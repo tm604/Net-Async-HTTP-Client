@@ -10,19 +10,19 @@ use IO::Async::Stream;
 use IO::Socket::UNIX;
 use Socket qw( AF_UNIX SOCK_STREAM PF_UNSPEC );
 
-use Net::Async::HTTP::Client;
+use Net::Async::HTTP;
 
 my $CRLF = "\x0d\x0a"; # because \r\n isn't portable
 
 my $loop = IO::Async::Loop::IO_Poll->new();
 testing_loop( $loop );
 
-my $client = Net::Async::HTTP::Client->new(
+my $client = Net::Async::HTTP->new(
    loop => $loop,
 );
 
 ok( defined $client, 'defined $client' );
-is( ref $client, "Net::Async::HTTP::Client", 'ref $client is Net::Async::HTTP::Client' );
+is( ref $client, "Net::Async::HTTP", 'ref $client is Net::Async::HTTP' );
 
 sub do_test_req
 {

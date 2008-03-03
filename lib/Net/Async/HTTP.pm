@@ -1,4 +1,4 @@
-package Net::Async::HTTP::Client;
+package Net::Async::HTTP;
 
 use strict;
 
