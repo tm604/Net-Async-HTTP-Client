@@ -260,6 +260,7 @@ do_test_uri( "simple POST",
    },
    expect_res_content => "New content",
 );
+
 do_test_uri( "form POST",
    method  => "POST",
    uri     => URI->new( "http://somewhere/handler" ),
