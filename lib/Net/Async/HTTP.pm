@@ -23,6 +23,8 @@ sub new
 
    my $self = bless {
       loop => $loop,
+
+      connections => {}, # { "$host:$port" } -> [ $conn, @pending_onread ]
    }, $class;
 
    return $self;
@@ -38,8 +40,22 @@ sub get_connection
 
    my $loop = $self->{loop};
 
+   my $host = $args{host};
+   my $port = $args{port};
+
+   if( my $cr = $self->{connections}->{"$host:$port"} ) {
+      my ( $conn ) = @$cr;
+
+      my $on_read = $on_ready->( $conn );
+      push @$cr, $on_read;
+
+      return;
+   }
+
    if( $args{handle} ) {
       my $on_read;
+
+      my $cr;
 
       my $conn = IO::Async::Stream->new(
          handle => $args{handle},
@@ -57,7 +73,13 @@ sub get_connection
                   return $r;
                }
                else {
+                  if( @$cr > 1 ) {
+                     $on_read = splice @$cr, 1, 1;
+                     return 1;
+                  }
+
                   $conn->close;
+                  delete $self->{connections}->{"$host:$port"};
                   return 0;
                }
             }
@@ -67,15 +89,14 @@ sub get_connection
          },
       );
 
+      $cr = $self->{connections}->{"$host:$port"} = [ $conn ];
+
       $loop->add( $conn );
 
       $on_read = $on_ready->( $conn );
 
       return;
    }
-
-   my $host = $args{host};
-   my $port = $args{port};
 
    $loop->connect(
       host     => $host,
@@ -155,6 +176,10 @@ sub do_request
    if( $args{handle} ) {
       $self->get_connection(
          handle => $args{handle},
+
+         # To make the connection cache logic happy
+         host => "[[local_io_handle]]",
+         port => fileno $args{handle},
 
          on_error => $on_error,
 
