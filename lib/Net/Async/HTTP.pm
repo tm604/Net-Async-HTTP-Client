@@ -28,6 +28,75 @@ sub new
    return $self;
 }
 
+sub get_connection
+{
+   my $self = shift;
+   my %args = @_;
+
+   my $on_ready = $args{on_ready} or croak "Expected 'on_ready' as a CODE ref";
+   my $on_error = $args{on_error} or croak "Expected 'on_error' as a CODE ref";
+
+   my $loop = $self->{loop};
+
+   if( $args{handle} ) {
+      my $on_read;
+
+      my $conn = IO::Async::Stream->new(
+         handle => $args{handle},
+
+         on_read => sub {
+            my ( $conn, $buffref, $closed ) = @_;
+
+            if( defined $on_read ) {
+               my $r = $on_read->( $conn, $buffref, $closed );
+               if( ref $r eq "CODE" ) {
+                  $on_read = $r;
+                  return 1;
+               }
+               elsif( defined $r ) {
+                  return $r;
+               }
+               else {
+                  $conn->close;
+                  return 0;
+               }
+            }
+            else {
+               die "Spurious on_read of connection while idle\n";
+            }
+         },
+      );
+
+      $loop->add( $conn );
+
+      $on_read = $on_ready->( $conn );
+
+      return;
+   }
+
+   my $host = $args{host};
+   my $port = $args{port};
+
+   $loop->connect(
+      host     => $host,
+      service  => $port,
+      socktype => SOCK_STREAM,
+
+      on_resolve_error => sub {
+         $on_error->( "$host:$port not resolvable [$_[0]]" );
+      },
+
+      on_connect_error => sub {
+         $on_error->( "$host:$port not contactable" );
+      },
+
+      on_connected => sub {
+         my ( $sock ) = @_;
+         $self->get_connection( %args, handle => $sock );
+      },
+   );
+}
+
 sub do_request
 {
    my $self = shift;
@@ -84,15 +153,22 @@ sub do_request
    }
 
    if( $args{handle} ) {
-      $self->do_request_handle(
-         %args,
-         request => $request,
-         handle  => $args{handle},
+      $self->get_connection(
+         handle => $args{handle},
+
+         on_error => $on_error,
+
+         on_ready => sub {
+            my ( $conn ) = @_;
+            return $self->do_request_conn(
+               %args,
+               request => $request,
+               conn    => $conn,
+            );
+         },
       );
    }
    else {
-      my $loop = $self->{loop};
-
       if( !defined $host ) {
          $host = delete $args{host} or croak "Expected 'host'";
       }
@@ -101,32 +177,25 @@ sub do_request
          $port = delete $args{port} or croak "Expected 'port'";
       }
 
-      $loop->connect(
-         host     => $args{proxy_host} || $host,
-         service  => $args{proxy_port} || $port,
-         socktype => SOCK_STREAM,
+      $self->get_connection(
+         host => $args{proxy_host} || $host,
+         port => $args{proxy_port} || $port,
 
-         on_resolve_error => sub {
-            $on_error->( "$host:$port not resolvable [$_[0]]" );
-         },
+         on_error => $on_error,
 
-         on_connect_error => sub {
-            $on_error->( "$host:$port not contactable" );
-         },
-
-         on_connected => sub {
-            my ( $sock ) = @_;
-            $self->do_request_handle(
+         on_ready => sub {
+            my ( $conn ) = @_;
+            return $self->do_request_conn(
                %args,
                request => $request,
-               handle  => $sock,
+               conn    => $conn,
             );
-         }
+         },
       );
    }
 }
 
-sub do_request_handle
+sub do_request_conn
 {
    my $self = shift;
    my %args = @_;
@@ -139,11 +208,18 @@ sub do_request_handle
 
    my $method = $req->method;
 
-   my $handle = $args{handle};
-   ref $handle and $handle->isa( "IO::Handle" ) or croak "Expected 'handle' as IO::Handle reference";
+   my $conn = $args{conn};
 
-   my $on_read;
-   $on_read = sub {
+   if( $method eq "POST" or $method eq "PUT" or length $req->content ) {
+      $req->init_header( "Content-Length", length $req->content );
+   }
+
+   # HTTP::Request is silly and uses "\n" as a separator. We must tell it to
+   # use the correct RFC 2616-compliant CRLF sequence.
+   $conn->write( $req->as_string( $CRLF ) );
+
+   # Now construct the on_read closure
+   return sub {
       my ( $conn, $buffref, $closed ) = @_;
 
       unless( $$buffref =~ s/^(.*?$CRLF$CRLF)//s ) {
@@ -160,8 +236,7 @@ sub do_request_handle
       # 204 (No Content) nor 304 (Not Modified)
       if( $method eq "HEAD" or $code =~ m/^1..$/ or $code eq "204" or $code eq "304" ) {
          $on_response->( $response );
-         $conn->close;
-         return 0;
+         return undef; # Finished
       }
 
       my $transfer_encoding = $response->header( "Transfer-Encoding" );
@@ -170,7 +245,7 @@ sub do_request_handle
       if( defined $transfer_encoding and $transfer_encoding eq "chunked" ) {
          my $chunk_length;
 
-         $on_read = sub {
+         return sub {
             my ( $conn, $buffref, $closed ) = @_;
 
             if( !defined $chunk_length and $$buffref =~ s/^(.*?)$CRLF// ) {
@@ -179,8 +254,7 @@ sub do_request_handle
                return 1 if $chunk_length;
 
                $on_response->( $response );
-               $conn->close;
-               return 0;
+               return undef; # Finished
             }
 
             if( defined $chunk_length and length( $$buffref ) >= $chunk_length ) {
@@ -200,11 +274,10 @@ sub do_request_handle
       elsif( defined $content_length ) {
          if( $content_length == 0 ) {
             $on_response->( $response );
-            $conn->close;
-            return 0;
+            return undef; # Finished
          }
 
-         $on_read = sub {
+         return sub {
             my ( $conn, $buffref, $closed ) = @_;
 
             if( length $$buffref >= $content_length ) {
@@ -213,8 +286,7 @@ sub do_request_handle
                $response->content( $content );
 
                $on_response->( $response );
-               $conn->close;
-               return 0;
+               return undef; # Finished
             }
 
             $on_error->( "Connection closed while awaiting body" ) if $closed;
@@ -222,7 +294,7 @@ sub do_request_handle
          };
       }
       else {
-         $on_read = sub {
+         return sub {
             my ( $conn, $buffref, $closed ) = @_;
 
             return 0 unless $closed;
@@ -238,23 +310,6 @@ sub do_request_handle
          };
       }
    };
-
-   if( $method eq "POST" or $method eq "PUT" or length $req->content ) {
-      $req->init_header( "Content-Length", length $req->content );
-   }
-
-   my $loop = $self->{loop};
-
-   my $conn = IO::Async::Stream->new(
-      handle => $handle,
-      on_read => sub { $on_read->( @_ ) },
-   );
-
-   $loop->add( $conn );
-
-   # HTTP::Request is silly and uses "\n" as a separator. We must tell it to
-   # use the correct RFC 2616-compliant CRLF sequence.
-   $conn->write( $req->as_string( $CRLF ) );
 }
 
 # Keep perl happy; keep Britain tidy
