@@ -331,7 +331,7 @@ sub do_request_conn
 
             $on_response->( $response );
             # $conn already closed
-            return 0;
+            return undef;
          };
       }
    };
