@@ -1,3 +1,8 @@
+#  You may distribute under the terms of either the GNU General Public License
+#  or the Artistic License (the same terms as Perl itself)
+#
+#  (C) Paul Evans, 2008 -- leonerd@leonerd.org.uk
+
 package Net::Async::HTTP;
 
 use strict;
@@ -14,6 +19,69 @@ use Socket qw( SOCK_STREAM );
 
 my $CRLF = "\x0d\x0a"; # More portable than \r\n
 
+=head1 NAME
+
+C<Net::Async::HTTP> - Asynchronous HTTP client
+
+=head1 SYNOPSIS
+
+ use IO::Async::Loop::...;
+ use Net::Async::HTTP;
+ use URI;
+
+ my $loop = IO::Async::Loop::...;
+
+ my $client = Net::Async::HTTP->new( loop => $loop );
+
+ $client->do_request(
+    uri => URI->new( "http://www.cpan.org/" ),
+
+    on_response => sub {
+       my ( $response ) = @_;
+       print "Front page of http://www.cpan.org/ is:\n";
+       print $response->as_string;
+       $loop->loop_stop;
+    },
+
+    on_error => sub {
+       my ( $message ) = @_;
+       print "Cannot fetch http://www.cpan.org/ - $message\n";
+       $loop->loop_stop;
+    },
+ );
+
+ $loop->loop_forever;
+
+=head1 DESCRIPTION
+
+This object class implements an asynchronous HTTP client. It sends requests to
+servers, and invokes continuation callbacks when responses are received. The
+object supports multiple concurrent connections to servers, and allows
+multiple outstanding requests in pipeline to any one connection. Normally,
+only one such object will be needed per program to support any number of
+requests.
+
+=cut
+
+=head1 CONSTRUCTOR
+
+=cut
+
+=head2 $client = Net::Async::HTTP->new( %args )
+
+This function returns a new instance of a C<Net::Async::HTTP> object. It takes
+the following named arguments:
+
+=over 8
+
+=item loop => IO::Async::Loop
+
+A reference to an C<IO::Async::Loop> object.
+
+=back
+
+=cut
+
 sub new
 {
    my $class = shift;
@@ -29,6 +97,10 @@ sub new
 
    return $self;
 }
+
+=head1 METHODS
+
+=cut
 
 sub get_connection
 {
@@ -118,6 +190,81 @@ sub get_connection
    );
 }
 
+=head2 $client->do_request( %args )
+
+Send an HTTP request to a server, and receive a reply. The request may be
+represented by an C<HTTP::Request> object, or a C<URI> object.
+
+The following named arguments are used for C<HTTP::Request>s:
+
+=over 8
+
+=item request => HTTP::Request
+
+A reference to an C<HTTP::Request> object
+
+=item host => STRING
+
+=item port => INT
+
+Hostname and port number of the server to connect to
+
+=back
+
+The following named arguments are used for C<URI> requests:
+
+=over 8
+
+=item uri => URI
+
+A reference to a C<URI> object
+
+=item method => STRING
+
+Optional. The HTTP method. If missing, C<GET> is used.
+
+=item content => STRING
+
+Optional. The body content to use for C<POST> requests.
+
+=item user => STRING
+
+=item pass => STRING
+
+Optional. If both are given, the HTTP Basic Authorization header will be sent
+with these details.
+
+=item proxy_host => STRING
+
+=item proxy_port => INT
+
+Optional. Override the hostname or port number implied by the URI.
+
+=back
+
+It takes the following continuation callbacks:
+
+=over 8
+
+=item on_response => CODE
+
+A callback that is invoked when a response to this request has been received.
+It will be passed an C<HTTP::Response> object containing the response the
+server sent.
+
+ $on_response->( $response )
+
+=item on_error => CODE
+
+A callback that is invoked if an error occurs while trying to send the request
+or obtain the response. It will be passed an error message.
+
+ $on_error->( $message )
+
+=back
+
+=cut
+
 sub do_request
 {
    my $self = shift;
@@ -173,7 +320,7 @@ sub do_request
       }
    }
 
-   if( $args{handle} ) {
+   if( $args{handle} ) { # INTERNAL UNDOCUMENTED
       $self->get_connection(
          handle => $args{handle},
 
@@ -339,3 +486,20 @@ sub do_request_conn
 
 # Keep perl happy; keep Britain tidy
 1;
+
+__END__
+
+=head1 SEE ALSO
+
+=over 4
+
+=item *
+
+L<RFC 2616|http://tools.ietf.org/html/rfc2616> - Hypertext Transfer Protocol
+-- HTTP/1.1
+
+=back
+
+=head1 AUTHOR
+
+Paul Evans E<lt>leonerd@leonerd.org.ukE<gt>
