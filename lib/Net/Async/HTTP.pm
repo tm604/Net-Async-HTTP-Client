@@ -192,8 +192,9 @@ sub get_connection
 
 =head2 $client->do_request( %args )
 
-Send an HTTP request to a server, and receive a reply. The request may be
-represented by an C<HTTP::Request> object, or a C<URI> object.
+Send an HTTP request to a server, and set up the callbacks to receive a reply.
+The request may be represented by an C<HTTP::Request> object, or a C<URI>
+object, depending on the arguments passed.
 
 The following named arguments are used for C<HTTP::Request>s:
 
@@ -242,7 +243,7 @@ Optional. Override the hostname or port number implied by the URI.
 
 =back
 
-It takes the following continuation callbacks:
+For either request type, it takes the following continuation callbacks:
 
 =over 8
 
