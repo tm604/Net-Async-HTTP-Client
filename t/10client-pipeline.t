@@ -53,7 +53,7 @@ sub do_uris
       handle => $S2,
 
       on_read => sub {
-         $request_stream = ${$_[1]};
+         $request_stream .= ${$_[1]};
          ${$_[1]} = "";
          return 0;
       }

@@ -48,7 +48,7 @@ sub do_test_req
       handle => $S2,
 
       on_read => sub {
-         $request_stream = ${$_[1]};
+         $request_stream .= ${$_[1]};
          ${$_[1]} = "";
          return 0;
       }
