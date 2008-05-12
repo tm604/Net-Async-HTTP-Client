@@ -17,6 +17,17 @@ use HTTP::Response;
 
 my $CRLF = "\x0d\x0a"; # More portable than \r\n
 
+=head1 NAME
+
+C<Net::Async::HTTP::Client> - Asynchronous HTTP client
+
+=head1 DESCRIPTION
+
+This class provides a connection to a single HTTP server, and is used
+internally by L<Net::Async::HTTP>. It is not intended for general use.
+
+=cut
+
 sub new
 {
    my $class = shift;
@@ -164,3 +175,12 @@ sub request
       on_read => $on_read,
    );
 }
+
+# Keep perl happy; keep Britain tidy
+1;
+
+__END__
+
+=head1 AUTHOR
+
+Paul Evans E<lt>leonerd@leonerd.org.ukE<gt>
