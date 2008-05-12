@@ -112,8 +112,24 @@ sub request
                $chunk_length = hex( $1 );
                return 1 if $chunk_length;
 
-               $on_response->( $response );
-               return undef; # Finished
+               my $trailer = "";
+
+               # Now the trailer
+               return sub {
+                  my ( $self, $buffref, $closed ) = @_;
+
+                  $on_error->( "Connection closed while awaiting chunk trailer" ) if $closed;
+
+                  $$buffref =~ s/^(.*)$CRLF// or return 0;
+                  $trailer .= $1;
+
+                  return 1 if length $1;
+
+                  # TODO: Actually use the trailer
+
+                  $on_response->( $response );
+                  return undef; # Finished
+               }
             }
 
             if( defined $chunk_length and length( $$buffref ) >= $chunk_length ) {

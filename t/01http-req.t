@@ -230,7 +230,8 @@ do_test_req( "GET chunks",
                $CRLF .
                "7$CRLF" . "Hello, " .
                "6$CRLF" . "world!" .
-               "0$CRLF",
+               "0$CRLF" .
+               "$CRLF",
 
    expect_res_code    => 200,
    expect_res_headers => {
