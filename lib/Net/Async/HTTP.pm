@@ -332,10 +332,9 @@ sub do_request
 
          on_ready => sub {
             my ( $conn ) = @_;
-            return $self->do_request_conn(
+            $conn->request(
                %args,
                request => $request,
-               conn    => $conn,
             );
          },
       );
