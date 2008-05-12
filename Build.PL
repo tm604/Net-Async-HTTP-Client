@@ -9,6 +9,7 @@ my $build = Module::Build->new
    dist_version_from => 'lib/Net/Async/HTTP.pm',
    build_requires => {
                         'IO::Async' => 0.13,
+                        'IO::Async::Sequencer' => 0,
                         'IO::Async::Test' => 0,
                         'Test::More' => 0,
                      },
