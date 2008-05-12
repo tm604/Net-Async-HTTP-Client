@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 45;
+use Test::More tests => 44;
 use IO::Async::Test;
 use IO::Async::Loop::IO_Poll;
 use IO::Async::Stream;
@@ -17,14 +17,13 @@ my $CRLF = "\x0d\x0a"; # because \r\n isn't portable
 my $loop = IO::Async::Loop::IO_Poll->new();
 testing_loop( $loop );
 
-my $client = Net::Async::HTTP->new(
+my $http = Net::Async::HTTP->new(
    loop => $loop,
 );
 
-ok( defined $client, 'defined $client' );
-is( ref $client, "Net::Async::HTTP", 'ref $client is Net::Async::HTTP' );
+# Most of this function copypasted from t/01http-req.t
 
-sub do_test_req
+sub do_test_uri
 {
    my $name = shift;
    my %args = @_;
@@ -35,8 +34,12 @@ sub do_test_req
    my $response;
    my $error;
 
-   $client->do_request(
-      request => $args{req},
+   $http->do_request(
+      uri     => $args{uri},
+      method  => $args{method},
+      user    => $args{user},
+      pass    => $args{pass},
+      content => $args{content},
       handle  => $S1,
 
       on_response => sub { $response = $_[0] },
@@ -56,7 +59,7 @@ sub do_test_req
 
    $loop->add( $otherend );
 
-   # Wait for the Client to send its request
+   # Wait for the client to send its request
    wait_for { $request_stream =~ m/$CRLF$CRLF/ };
 
    $request_stream =~ s/^(.*)$CRLF//;
@@ -84,7 +87,7 @@ sub do_test_req
    $otherend->write( $args{response} );
    $otherend->close if $args{close_after_response};
 
-   # Wait for the Client to finish its response
+   # Wait for the server to finish its response
    wait_for { defined $response or defined $error };
 
    if( $args{expect_error} ) {
@@ -113,13 +116,9 @@ sub do_test_req
    }
 }
 
-my $req;
-
-$req = HTTP::Request->new( HEAD => "/some/path", [ Host => "myhost" ] );
-$req->protocol( "HTTP/1.1");
-
-do_test_req( "simple HEAD",
-   req => $req,
+do_test_uri( "simple HEAD",
+   method => "HEAD",
+   uri    => URI->new( "http://myhost/some/path" ),
 
    expect_req_firstline => "HEAD /some/path HTTP/1.1",
    expect_req_headers => {
@@ -139,11 +138,9 @@ do_test_req( "simple HEAD",
    expect_res_content => "",
 );
 
-$req = HTTP::Request->new( GET => "/some/path", [ Host => "myhost" ] );
-$req->protocol( "HTTP/1.1" );
-
-do_test_req( "simple GET",
-   req => $req,
+do_test_uri( "simple GET",
+   method => "GET",
+   uri    => URI->new( "http://myhost/some/path" ),
 
    expect_req_firstline => "GET /some/path HTTP/1.1",
    expect_req_headers => {
@@ -164,117 +161,89 @@ do_test_req( "simple GET",
    expect_res_content => "Hello, world!",
 );
 
-$req = HTTP::Request->new( GET => "/empty", [ Host => "myhost" ] );
-$req->protocol( "HTTP/1.1" );
+do_test_uri( "GET with params",
+   method => "GET",
+   uri    => URI->new( "http://myhost/cgi?param=value" ),
 
-do_test_req( "GET with empty body",
-   req => $req,
-
-   expect_req_firstline => "GET /empty HTTP/1.1",
+   expect_req_firstline => "GET /cgi?param=value HTTP/1.1",
    expect_req_headers => {
       Host => "myhost",
    },
 
    response => "HTTP/1.1 200 OK$CRLF" . 
-               "Content-Length: 0$CRLF" . 
+               "Content-Length: 11$CRLF" . 
                "Content-Type: text/plain$CRLF" .
-               $CRLF,
+               $CRLF . 
+               "CGI content",
 
    expect_res_code    => 200,
    expect_res_headers => {
-      'Content-Length' => 0,
+      'Content-Length' => 11,
       'Content-Type'   => "text/plain",
    },
-   expect_res_content => "",
+   expect_res_content => "CGI content",
 );
 
-$req = HTTP::Request->new( GET => "/somethingmissing", [ Host => "somewhere" ] );
-$req->protocol( "HTTP/1.1" );
+do_test_uri( "authenticated GET",
+   method => "GET",
+   uri    => URI->new( "http://myhost/secret" ),
+   user   => "user",
+   pass   => "pass",
 
-do_test_req( "GET not found",
-   req => $req,
-
-   expect_req_firstline => "GET /somethingmissing HTTP/1.1",
+   expect_req_firstline => "GET /secret HTTP/1.1",
    expect_req_headers => {
-      Host => "somewhere",
-   },
-
-   response => "HTTP/1.1 404 Not Found$CRLF" . 
-               "Content-Length: 0$CRLF" .
-               "Content-Type: text/plain$CRLF" .
-               $CRLF,
-
-   expect_res_code    => 404,
-   expect_res_headers => {
-      'Content-Length' => 0,
-      'Content-Type'   => "text/plain",
-   },
-   expect_res_content => "",
-);
-
-$req = HTTP::Request->new( GET => "/stream", [ Host => "somewhere" ] );
-$req->protocol( "HTTP/1.1" );
-
-do_test_req( "GET chunks",
-   req => $req,
-
-   expect_req_firstline => "GET /stream HTTP/1.1",
-   expect_req_headers => {
-      Host => "somewhere",
+      Host => "myhost",
+      Authorization => "Basic dXNlcjpwYXNz", # determined using 'wget'
    },
 
    response => "HTTP/1.1 200 OK$CRLF" . 
-               "Content-Length: 13$CRLF" .
+               "Content-Length: 18$CRLF" . 
                "Content-Type: text/plain$CRLF" .
-               "Transfer-Encoding: chunked$CRLF" .
-               $CRLF .
-               "7$CRLF" . "Hello, " .
-               "6$CRLF" . "world!" .
-               "0$CRLF",
+               $CRLF . 
+               "For your eyes only",
 
    expect_res_code    => 200,
    expect_res_headers => {
-      'Content-Length' => 13,
+      'Content-Length' => 18,
       'Content-Type'   => "text/plain",
-      'Transfer-Encoding' => "chunked",
    },
-   expect_res_content => "Hello, world!",
+   expect_res_content => "For your eyes only",
 );
 
-$req = HTTP::Request->new( GET => "/untileof", [ Host => "somewhere" ] );
-$req->protocol( "HTTP/1.1" );
+do_test_uri( "authenticated GET (URL embedded)",
+   method => "GET",
+   uri    => URI->new( "http://user:pass\@myhost/private" ),
 
-do_test_req( "GET unspecified length",
-   req => $req,
-
-   expect_req_firstline => "GET /untileof HTTP/1.1",
+   expect_req_firstline => "GET /private HTTP/1.1",
    expect_req_headers => {
-      Host => "somewhere",
+      Host => "myhost",
+      Authorization => "Basic dXNlcjpwYXNz", # determined using 'wget'
    },
 
    response => "HTTP/1.1 200 OK$CRLF" . 
+               "Content-Length: 6$CRLF" . 
                "Content-Type: text/plain$CRLF" .
-               $CRLF .
-               "Some more content here",
-   close_after_response => 1,
+               $CRLF . 
+               "Shhhh!",
 
    expect_res_code    => 200,
    expect_res_headers => {
+      'Content-Length' => 6,
       'Content-Type'   => "text/plain",
    },
-   expect_res_content => "Some more content here",
+   expect_res_content => "Shhhh!",
 );
 
-$req = HTTP::Request->new( POST => "/handler", [ Host => "somewhere" ], "New content" );
-$req->protocol( "HTTP/1.1" );
-
-do_test_req( "simple POST",
-   req => $req,
+do_test_uri( "simple POST",
+   method  => "POST",
+   uri     => URI->new( "http://somewhere/handler" ),
+   content => "New content",
 
    expect_req_firstline => "POST /handler HTTP/1.1",
    expect_req_headers => {
       Host => "somewhere",
       'Content-Length' => 11,
+      'Content-Type' => "application/x-www-form-urlencoded",
    },
    expect_req_content => "New content",
 
@@ -290,5 +259,32 @@ do_test_req( "simple POST",
       'Content-Type'   => "text/plain",
    },
    expect_res_content => "New content",
+);
+
+do_test_uri( "form POST",
+   method  => "POST",
+   uri     => URI->new( "http://somewhere/handler" ),
+   content => [ param => "value", another => "value with things" ],
+
+   expect_req_firstline => "POST /handler HTTP/1.1",
+   expect_req_headers => {
+      Host => "somewhere",
+      'Content-Length' => 37,
+      'Content-Type' => "application/x-www-form-urlencoded",
+   },
+   expect_req_content => "param=value&another=value+with+things",
+
+   response => "HTTP/1.1 200 OK$CRLF" . 
+               "Content-Length: 4$CRLF" .
+               "Content-Type: text/plain$CRLF" .
+               $CRLF .
+               "Done",
+
+   expect_res_code    => 200,
+   expect_res_headers => {
+      'Content-Length' => 4,
+      'Content-Type'   => "text/plain",
+   },
+   expect_res_content => "Done",
 );
 

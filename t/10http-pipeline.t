@@ -17,11 +17,11 @@ my $CRLF = "\x0d\x0a"; # because \r\n isn't portable
 my $loop = IO::Async::Loop::IO_Poll->new();
 testing_loop( $loop );
 
-my $client = Net::Async::HTTP->new(
+my $http = Net::Async::HTTP->new(
    loop => $loop,
 );
 
-# Most of this function copypasted from t/01client-req.t
+# Most of this function copypasted from t/01http-req.t
 
 sub do_uris
 {
@@ -36,7 +36,7 @@ sub do_uris
 
       my $id = $wait_id;
 
-      $client->do_request(
+      $http->do_request(
          uri     => $uri,
          method  => 'GET',
          handle  => $S1,
@@ -62,7 +62,7 @@ sub do_uris
    $loop->add( $otherend );
 
    while( keys %wait ) {
-      # Wait for the Client to send its request
+      # Wait for the client to send its request
       wait_for { $request_stream =~ m/$CRLF$CRLF/ };
 
       $request_stream =~ s/^(.*)$CRLF//;
@@ -88,7 +88,7 @@ sub do_uris
                         $CRLF .
                         $body );
 
-      # Wait for the Client to finish its response
+      # Wait for the server to finish its response
       wait_for { keys %wait < $waitcount };
    }
 }
@@ -96,7 +96,7 @@ sub do_uris
 do_uris(
    URI->new( "http://server/path/single" ) => sub {
       my ( $req ) = @_;
-      is( $req->content, "GET /path/single HTTP/1.1", 'Single client' );
+      is( $req->content, "GET /path/single HTTP/1.1", 'Single request' );
    },
 );
 
