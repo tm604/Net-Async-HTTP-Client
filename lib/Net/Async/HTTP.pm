@@ -20,7 +20,7 @@ use Socket qw( SOCK_STREAM );
 
 =head1 NAME
 
-C<Net::Async::HTTP> - Asynchronous HTTP client
+C<Net::Async::HTTP> - Asynchronous HTTP user agent
 
 =head1 SYNOPSIS
 
@@ -30,9 +30,9 @@ C<Net::Async::HTTP> - Asynchronous HTTP client
 
  my $loop = IO::Async::Loop::...;
 
- my $client = Net::Async::HTTP->new( loop => $loop );
+ my $http = Net::Async::HTTP->new( loop => $loop );
 
- $client->do_request(
+ $http->do_request(
     uri => URI->new( "http://www.cpan.org/" ),
 
     on_response => sub {
@@ -53,12 +53,12 @@ C<Net::Async::HTTP> - Asynchronous HTTP client
 
 =head1 DESCRIPTION
 
-This object class implements an asynchronous HTTP client. It sends requests to
-servers, and invokes continuation callbacks when responses are received. The
-object supports multiple concurrent connections to servers, and allows
-multiple outstanding requests in pipeline to any one connection. Normally,
-only one such object will be needed per program to support any number of
-requests.
+This object class implements an asynchronous HTTP user agent. It sends
+requests to servers, and invokes continuation callbacks when responses are
+received. The object supports multiple concurrent connections to servers, and
+allows multiple outstanding requests in pipeline to any one connection.
+Normally, only one such object will be needed per program to support any
+number of requests.
 
 =cut
 
@@ -66,7 +66,7 @@ requests.
 
 =cut
 
-=head2 $client = Net::Async::HTTP->new( %args )
+=head2 $http = Net::Async::HTTP->new( %args )
 
 This function returns a new instance of a C<Net::Async::HTTP> object. It takes
 the following named arguments:
@@ -165,7 +165,7 @@ sub get_connection
    );
 }
 
-=head2 $client->do_request( %args )
+=head2 $http->do_request( %args )
 
 Send an HTTP request to a server, and set up the callbacks to receive a reply.
 The request may be represented by an C<HTTP::Request> object, or a C<URI>
