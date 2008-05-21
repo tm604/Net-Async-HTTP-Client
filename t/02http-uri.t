@@ -19,6 +19,7 @@ testing_loop( $loop );
 
 my $http = Net::Async::HTTP->new(
    loop => $loop,
+   user_agent => "", # Don't put one in request headers
 );
 
 # Most of this function copypasted from t/01http-req.t

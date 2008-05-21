@@ -19,6 +19,7 @@ testing_loop( $loop );
 
 my $http = Net::Async::HTTP->new(
    loop => $loop,
+   user_agent => "", # Don't put one in request headers
 );
 
 ok( defined $http, 'defined $http' );

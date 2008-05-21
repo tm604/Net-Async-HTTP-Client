@@ -77,6 +77,11 @@ the following named arguments:
 
 A reference to an C<IO::Async::Loop> object.
 
+=item user_agent => STRING
+
+A string to set in the C<User-Agent> HTTP header. If not supplied, one will
+be constructed that declares C<Net::Async::HTTP> and the version number.
+
 =back
 
 =cut
@@ -92,6 +97,9 @@ sub new
       loop => $loop,
 
       connections => {}, # { "$host:$port" } -> [ $conn, @pending_onread ]
+
+      user_agent => defined $args{user_agent} ? $args{user_agent}
+                                              : "Perl + " . __PACKAGE__ . "/$VERSION",
    }, $class;
 
    return $self;
@@ -295,6 +303,8 @@ sub do_request
          $request->authorization_basic( $user, $pass );
       }
    }
+
+    $request->init_header( 'User-Agent' => $self->{user_agent} ) if length $self->{user_agent};
 
    if( $args{handle} ) { # INTERNAL UNDOCUMENTED
       $self->get_connection(
