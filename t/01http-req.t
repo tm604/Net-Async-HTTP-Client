@@ -229,8 +229,8 @@ do_test_req( "GET chunks",
                "Content-Type: text/plain$CRLF" .
                "Transfer-Encoding: chunked$CRLF" .
                $CRLF .
-               "7$CRLF" . "Hello, " .
-               "6$CRLF" . "world!" .
+               "7$CRLF" . "Hello, " . $CRLF .
+               "6$CRLF" . "world!" . $CRLF .
                "0$CRLF" .
                "$CRLF",
 

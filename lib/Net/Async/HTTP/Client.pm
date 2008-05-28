@@ -132,10 +132,16 @@ sub request
                }
             }
 
-            if( defined $chunk_length and length( $$buffref ) >= $chunk_length ) {
+            # Chunk is followed by a CRLF, which isn't counted in the length;
+            if( defined $chunk_length and length( $$buffref ) >= $chunk_length + 2 ) {
                # Chunk body
                my $chunk = substr( $$buffref, 0, $chunk_length, "" );
                undef $chunk_length;
+
+               unless( $$buffref =~ s/^$CRLF// ) {
+                  $on_error->( "Chunk of size $chunk_length wasn't followed by CRLF" );
+                  $self->close;
+               }
 
                $response->add_content( $chunk );
 
