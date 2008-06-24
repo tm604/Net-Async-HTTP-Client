@@ -6,7 +6,6 @@ use Module::Build;
 my $build = Module::Build->new
   (
    module_name => 'Net::Async::HTTP',
-   dist_version_from => 'lib/Net/Async/HTTP.pm',
    build_requires => {
                         'IO::Async' => 0.14,
                         'IO::Async::Sequencer' => 0,
