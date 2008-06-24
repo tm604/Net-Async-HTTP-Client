@@ -6,6 +6,10 @@ use Module::Build;
 my $build = Module::Build->new
   (
    module_name => 'Net::Async::HTTP',
+   requires => {
+                 'HTTP::Request' => 0,
+                 'HTTP::Response' => 0,
+   },
    build_requires => {
                         'IO::Async' => 0.14,
                         'IO::Async::Sequencer' => 0,
