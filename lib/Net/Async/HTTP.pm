@@ -233,7 +233,7 @@ For either request type, it takes the following continuation callbacks:
 =item on_response => CODE
 
 A callback that is invoked when a response to this request has been received.
-It will be passed an C<HTTP::Response> object containing the response the
+It will be passed an L<HTTP::Response> object containing the response the
 server sent.
 
  $on_response->( $response )
