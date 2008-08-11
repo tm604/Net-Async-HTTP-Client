@@ -351,7 +351,7 @@ sub do_request
       }
    }
 
-    $request->init_header( 'User-Agent' => $self->{user_agent} ) if length $self->{user_agent};
+   $request->init_header( 'User-Agent' => $self->{user_agent} ) if length $self->{user_agent};
 
    if( $args{handle} ) { # INTERNAL UNDOCUMENTED
       $self->get_connection(
