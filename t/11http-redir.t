@@ -4,7 +4,7 @@ use strict;
 
 use Test::More tests => 5;
 use IO::Async::Test;
-use IO::Async::Loop::IO_Poll;
+use IO::Async::Loop;
 use IO::Async::Stream;
 
 use IO::Socket::UNIX;
@@ -14,7 +14,7 @@ use Net::Async::HTTP;
 
 my $CRLF = "\x0d\x0a"; # because \r\n isn't portable
 
-my $loop = IO::Async::Loop::IO_Poll->new();
+my $loop = IO::Async::Loop->new();
 testing_loop( $loop );
 
 my $http = Net::Async::HTTP->new(
