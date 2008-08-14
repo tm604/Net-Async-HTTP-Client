@@ -353,13 +353,13 @@ sub do_request
 
    $request->init_header( 'User-Agent' => $self->{user_agent} ) if length $self->{user_agent};
 
-   if( $args{handle} ) { # INTERNAL UNDOCUMENTED
+   if( my $handle = $args{handle} ) { # INTERNAL UNDOCUMENTED
       $self->get_connection(
-         handle => $args{handle},
+         handle => $handle,
 
          # To make the connection cache logic happy
          host => "[[local_io_handle]]",
-         port => fileno $args{handle},
+         port => $handle->fileno,
 
          on_error => $on_error,
 
