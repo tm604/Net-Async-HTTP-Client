@@ -24,11 +24,11 @@ C<Net::Async::HTTP> - Asynchronous HTTP user agent
 
 =head1 SYNOPSIS
 
- use IO::Async::Loop::...;
+ use IO::Async::Loop;
  use Net::Async::HTTP;
  use URI;
 
- my $loop = IO::Async::Loop::...;
+ my $loop = IO::Async::Loop->new();
 
  my $http = Net::Async::HTTP->new( loop => $loop );
 
