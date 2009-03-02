@@ -20,7 +20,7 @@ my $http = Net::Async::HTTP->new(
 );
 
 ok( defined $http, 'defined $http' );
-is( ref $http, "Net::Async::HTTP", 'ref $http is Net::Async::HTTP' );
+isa_ok( $http, "Net::Async::HTTP", '$http isa Net::Async::HTTP' );
 
 sub do_test_req
 {
