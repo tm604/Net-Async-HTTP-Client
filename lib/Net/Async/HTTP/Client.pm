@@ -6,6 +6,7 @@
 package Net::Async::HTTP::Client;
 
 use strict;
+use warnings;
 
 our $VERSION = '0.03';
 
