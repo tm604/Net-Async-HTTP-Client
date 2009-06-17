@@ -442,4 +442,4 @@ L<RFC 2616|http://tools.ietf.org/html/rfc2616> - Hypertext Transfer Protocol
 
 =head1 AUTHOR
 
-Paul Evans E<lt>leonerd@leonerd.org.ukE<gt>
+Paul Evans <leonerd@leonerd.org.uk>
