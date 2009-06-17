@@ -106,6 +106,8 @@ be constructed that declares C<Net::Async::HTTP> and the version number.
 Optional. How many levels of redirection to follow. If not supplied, will
 default to 3. Give 0 to disable redirection entirely.
 
+=back
+
 =cut
 
 sub configure
