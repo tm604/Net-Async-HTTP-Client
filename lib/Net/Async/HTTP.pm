@@ -437,8 +437,7 @@ __END__
 
 =item *
 
-L<RFC 2616|http://tools.ietf.org/html/rfc2616> - Hypertext Transfer Protocol
--- HTTP/1.1
+L<http://tools.ietf.org/html/rfc2616> - Hypertext Transfer Protocol -- HTTP/1.1
 
 =back
 
