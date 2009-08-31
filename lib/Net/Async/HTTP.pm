@@ -196,7 +196,7 @@ sub get_connection
 =head2 $http->do_request( %args )
 
 Send an HTTP request to a server, and set up the callbacks to receive a reply.
-The request may be represented by an C<HTTP::Request> object, or a C<URI>
+The request may be represented by an L<HTTP::Request> object, or a L<URI>
 object, depending on the arguments passed.
 
 The following named arguments are used for C<HTTP::Request>s:
