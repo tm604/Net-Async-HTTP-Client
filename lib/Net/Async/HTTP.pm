@@ -145,17 +145,12 @@ sub get_connection
    if( my $cr = $self->{connections}->{"$host:$port"} ) {
       my ( $conn ) = @$cr;
 
-      my $on_read = $on_ready->( $conn );
-      push @$cr, $on_read;
+      $on_ready->( $conn );
 
       return;
    }
 
    if( $args{handle} ) {
-      my $on_read;
-
-      my $cr;
-
       my $conn = Net::Async::HTTP::Client->new(
          handle => $args{handle},
 
@@ -164,11 +159,11 @@ sub get_connection
          },
       );
 
-      $cr = $self->{connections}->{"$host:$port"} = [ $conn ];
+      $self->{connections}->{"$host:$port"} = [ $conn ];
 
       $self->add_child( $conn );
 
-      $on_read = $on_ready->( $conn );
+      $on_ready->( $conn );
 
       return;
    }
