@@ -150,9 +150,9 @@ sub get_connection
       return;
    }
 
-   if( $args{handle} ) {
+   if( $args{transport} ) {
       my $conn = Net::Async::HTTP::Client->new(
-         handle => $args{handle},
+         transport => $args{transport},
 
          on_closed => sub {
             delete $self->{connections}->{"$host:$port"};
@@ -183,7 +183,10 @@ sub get_connection
 
       on_connected => sub {
          my ( $sock ) = @_;
-         $self->get_connection( %args, handle => $sock );
+
+         my $transport = IO::Async::Stream->new( handle => $sock );
+
+         $self->get_connection( %args, transport => $transport );
       },
    );
 }
@@ -387,8 +390,10 @@ sub do_request
    $request->init_header( 'User-Agent' => $self->{user_agent} ) if length $self->{user_agent};
 
    if( my $handle = $args{handle} ) { # INTERNAL UNDOCUMENTED
+      my $transport = IO::Async::Stream->new( handle => $handle );
+
       $self->get_connection(
-         handle => $handle,
+         transport => $transport,
 
          # To make the connection cache logic happy
          host => "[[local_io_handle]]",
