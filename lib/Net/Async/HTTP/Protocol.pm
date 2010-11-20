@@ -49,8 +49,8 @@ sub request
    my $self = shift;
    my %args = @_;
 
-   my $on_response = $args{on_response} or croak "Expected 'on_response' as a CODE ref";
-   my $on_error    = $args{on_error}    or croak "Expected 'on_error' as a CODE ref";
+   my $on_header = $args{on_header} or croak "Expected 'on_header' as a CODE ref";
+   my $on_error  = $args{on_error}  or croak "Expected 'on_error' as a CODE ref";
    
    my $req = $args{request};
    ref $req and $req->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
@@ -69,20 +69,21 @@ sub request
          return 0;
       }
 
-      my $response_header = $1;
-      my $response = HTTP::Response->parse( $response_header );
+      my $header = HTTP::Response->parse( $1 );
 
-      my $code = $response->code;
+      my $on_body_chunk = $on_header->( $header );
+
+      my $code = $header->code;
 
       # RFC 2616 says "HEAD" does not have a body, nor do any 1xx codes, nor
       # 204 (No Content) nor 304 (Not Modified)
       if( $method eq "HEAD" or $code =~ m/^1..$/ or $code eq "204" or $code eq "304" ) {
-         $on_response->( $response );
+         $on_body_chunk->();
          return undef; # Finished
       }
 
-      my $transfer_encoding = $response->header( "Transfer-Encoding" );
-      my $content_length = $response->content_length;
+      my $transfer_encoding = $header->header( "Transfer-Encoding" );
+      my $content_length = $header->content_length;
 
       if( defined $transfer_encoding and $transfer_encoding eq "chunked" ) {
          my $chunk_length;
@@ -110,7 +111,7 @@ sub request
 
                   # TODO: Actually use the trailer
 
-                  $on_response->( $response );
+                  $on_body_chunk->();
                   return undef; # Finished
                }
             }
@@ -126,7 +127,7 @@ sub request
                   $self->close;
                }
 
-               $response->add_content( $chunk );
+               $on_body_chunk->( $chunk );
 
                return 1;
             }
@@ -137,7 +138,7 @@ sub request
       }
       elsif( defined $content_length ) {
          if( $content_length == 0 ) {
-            $on_response->( $response );
+            $on_body_chunk->();
             return undef; # Finished
          }
 
@@ -147,9 +148,9 @@ sub request
             if( length $$buffref >= $content_length ) {
                my $content = substr( $$buffref, 0, $content_length, "" );
 
-               $response->content( $content );
+               $on_body_chunk->( $content );
 
-               $on_response->( $response );
+               $on_body_chunk->();
                return undef; # Finished
             }
 
@@ -166,9 +167,9 @@ sub request
             my $content = $$buffref;
             $$buffref = "";
 
-            $response->content( $content );
+            $on_body_chunk->( $content );
 
-            $on_response->( $response );
+            $on_body_chunk->();
             # $self already closed
             return undef;
          };

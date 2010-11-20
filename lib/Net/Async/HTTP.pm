@@ -337,6 +337,16 @@ sub do_request
       }
    };
 
+   my $on_header = sub {
+      my ( $response ) = @_;
+
+      return sub {
+         return $on_resp_redir->( $response ) unless @_;
+
+         $response->add_content( @_ );
+      };
+   };
+
    my $request;
 
    if( $args{request} ) {
@@ -405,8 +415,8 @@ sub do_request
             my ( $conn ) = @_;
             $conn->request(
                request => $request,
-               on_response => $on_resp_redir,
-               on_error    => $on_error,
+               on_header => $on_header,
+               on_error  => $on_error,
             );
          },
       );
@@ -430,8 +440,8 @@ sub do_request
             my ( $conn ) = @_;
             $conn->request(
                request => $request,
-               on_response => $on_resp_redir,
-               on_error    => $on_error,
+               on_header => $on_header,
+               on_error  => $on_error,
             );
          },
       );
