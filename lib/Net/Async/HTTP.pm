@@ -299,11 +299,21 @@ sub do_request
    my $host;
    my $port;
 
-   # Now build a new on_response continuation that has all the redirect logic
-   my $on_resp_redir = sub {
+   my $on_header = sub {
       my ( $response ) = @_;
 
-      if( $response->is_redirect and $max_redirects > 0 ) {
+      if( !$response->is_redirect or $max_redirects == 0 ) {
+         return sub {
+            return $on_response->( $response ) unless @_;
+
+            $response->add_content( @_ );
+         };
+      }
+
+      # Ignore body but handle redirect at the end of it
+      return sub {
+         return if @_;
+
          my $location = $response->header( "Location" );
 
          if( $location =~ m{^http://} ) {
@@ -332,19 +342,6 @@ sub do_request
             max_redirects => $max_redirects - 1,
          );
       }
-      else {
-         $on_response->( $response );
-      }
-   };
-
-   my $on_header = sub {
-      my ( $response ) = @_;
-
-      return sub {
-         return $on_resp_redir->( $response ) unless @_;
-
-         $response->add_content( @_ );
-      };
    };
 
    my $request;
