@@ -2,7 +2,7 @@
 
 use strict;
 
-use Test::More tests => 10;
+use Test::More tests => 15;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -54,7 +54,13 @@ isa_ok( $header, "HTTP::Response", '$header for Content-Length' );
 is( $header->content_length, 15, '$header->content_length' );
 is( $header->content_type, "text/plain", '$header->content_type' );
 
-$S2->syswrite( "Hello, world!$CRLF" );
+$S2->syswrite( "Hello, " );
+
+wait_for { length $body == 7 };
+
+is( $body, "Hello, ", '$body partial Content-Length' );
+
+$S2->syswrite( "world!$CRLF" );
 
 wait_for { $body_is_done };
 is( $body, "Hello, world!$CRLF", '$body' );
@@ -107,3 +113,50 @@ $S2->syswrite( "0$CRLF" . $CRLF );
 
 wait_for { $body_is_done };
 is( $body, "Hello, world!$CRLF", '$body chunked' );
+
+undef $header;
+undef $body;
+undef $body_is_done;
+
+$http->do_request(
+   uri => URI->new( "http://my.server/here" ),
+   handle => $S1,
+
+   on_header => sub {
+      ( $header ) = @_;
+      $body = "";
+      return sub {
+         @_ ? $body .= $_[0] : $body_is_done++;
+      }
+   },
+   on_error => sub { die "Test died early - $_[0]" },
+);
+
+# Wait for request but don't really care what it actually is
+$request_stream = "";
+wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $S2 => $request_stream;
+
+$S2->syswrite( "HTTP/1.0 200 OK$CRLF" .
+               "Content-Type: text/plain$CRLF" .
+               "$CRLF" );
+
+wait_for { defined $header };
+
+isa_ok( $header, "HTTP::Response", '$header for EOF' );
+is( $header->content_type, "text/plain", '$header->content_type' );
+
+$S2->syswrite( "Hello, " );
+
+wait_for { length $body == 7 };
+
+is( $body, "Hello, ", '$body partial EOF' );
+
+$S2->syswrite( "world!$CRLF" );
+
+wait_for { length $body == 15 };
+
+is( $body, "Hello, world!$CRLF", '$body' );
+
+$S2->close;
+
+wait_for { $body_is_done };

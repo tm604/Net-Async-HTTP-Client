@@ -145,13 +145,16 @@ sub request
          return sub {
             my ( $self, $buffref, $closed ) = @_;
 
-            if( length $$buffref >= $content_length ) {
-               my $content = substr( $$buffref, 0, $content_length, "" );
+            # This will truncate it if the server provided too much
+            my $content = substr( $$buffref, 0, $content_length, "" );
 
-               $on_body_chunk->( $content );
+            $on_body_chunk->( $content );
 
+            $content_length -= length $content;
+
+            if( $content_length == 0 ) {
                $on_body_chunk->();
-               return undef; # Finished
+               return undef;
             }
 
             $on_error->( "Connection closed while awaiting body" ) if $closed;
@@ -162,12 +165,10 @@ sub request
          return sub {
             my ( $self, $buffref, $closed ) = @_;
 
-            return 0 unless $closed;
-
-            my $content = $$buffref;
+            $on_body_chunk->( $$buffref );
             $$buffref = "";
 
-            $on_body_chunk->( $content );
+            return 0 unless $closed;
 
             $on_body_chunk->();
             # $self already closed
