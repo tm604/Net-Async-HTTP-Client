@@ -264,6 +264,18 @@ server sent.
 
  $on_response->( $response )
 
+=item on_header => CODE
+
+Alternative to C<on_response>. A callback that is invoked when the header of a
+response has been received. It is expected to return a C<CODE> reference for
+handling chunks of body content. This C<CODE> reference will be invoked with
+no arguments once the end of the request has been reached.
+
+ $on_body_chunk = $on_header->( $header )
+
+    $on_body_chunk->( $data )
+    $on_body_chunk->()
+
 =item on_error => CODE
 
 A callback that is invoked if an error occurs while trying to send the request
@@ -293,7 +305,8 @@ sub do_request
    my $self = shift;
    my %args = @_;
 
-   my $on_response = $args{on_response} or croak "Expected 'on_response' as a CODE ref";
+   my $on_response = $args{on_response} or
+      my $on_header = $args{on_header}  or croak "Expected 'on_response' or 'on_header' as CODE ref";
    my $on_error    = $args{on_error}    or croak "Expected 'on_error' as a CODE ref";
 
    my $max_redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
@@ -301,10 +314,11 @@ sub do_request
    my $host;
    my $port;
 
-   my $on_header = sub {
+   my $on_header_redir = sub {
       my ( $response ) = @_;
 
       if( !$response->is_redirect or $max_redirects == 0 ) {
+         return $on_header->( $response ) if $on_header;
          return sub {
             return $on_response->( $response ) unless @_;
 
@@ -414,7 +428,7 @@ sub do_request
             my ( $conn ) = @_;
             $conn->request(
                request => $request,
-               on_header => $on_header,
+               on_header => $on_header_redir,
                on_error  => $on_error,
             );
          },
@@ -439,7 +453,7 @@ sub do_request
             my ( $conn ) = @_;
             $conn->request(
                request => $request,
-               on_header => $on_header,
+               on_header => $on_header_redir,
                on_error  => $on_error,
             );
          },
