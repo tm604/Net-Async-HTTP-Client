@@ -21,6 +21,8 @@ use Net::Async::HTTP::Protocol;
 use HTTP::Request;
 use HTTP::Request::Common qw();
 
+use IO::Async::Stream;
+
 use Socket qw( SOCK_STREAM );
 
 =head1 NAME
