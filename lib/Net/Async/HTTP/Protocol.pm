@@ -1,9 +1,9 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2008,2009 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2008-2010 -- leonerd@leonerd.org.uk
 
-package Net::Async::HTTP::Client;
+package Net::Async::HTTP::Protocol;
 
 use strict;
 use warnings;
@@ -20,7 +20,7 @@ my $CRLF = "\x0d\x0a"; # More portable than \r\n
 
 =head1 NAME
 
-C<Net::Async::HTTP::Client> - Asynchronous HTTP client
+C<Net::Async::HTTP::Protocol> - HTTP client protocol handler
 
 =head1 DESCRIPTION
 

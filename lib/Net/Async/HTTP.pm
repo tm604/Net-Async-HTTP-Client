@@ -16,7 +16,7 @@ our $DEFAULT_MAXREDIR = 3;
 
 use Carp;
 
-use Net::Async::HTTP::Client;
+use Net::Async::HTTP::Protocol;
 
 use HTTP::Request;
 use HTTP::Request::Common qw();
@@ -151,7 +151,7 @@ sub get_connection
    }
 
    if( $args{transport} ) {
-      my $conn = Net::Async::HTTP::Client->new(
+      my $conn = Net::Async::HTTP::Protocol->new(
          transport => $args{transport},
 
          on_closed => sub {
