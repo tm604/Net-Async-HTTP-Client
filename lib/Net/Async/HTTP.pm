@@ -70,6 +70,10 @@ allows multiple outstanding requests in pipeline to any one connection.
 Normally, only one such object will be needed per program to support any
 number of requests.
 
+This module optionally supports SSL connections, if L<IO::Async::SSL> is
+installed. If so, SSL can be requested either by passing a URI with the
+C<https> scheme, or by passing the a true value as the C<SSL> parameter.
+
 =cut
 
 sub new
@@ -230,6 +234,10 @@ A reference to an C<HTTP::Request> object
 
 Hostname and port number of the server to connect to
 
+=item SSL => BOOL
+
+Optional. If true, an SSL connection will be used.
+
 =back
 
 The following named arguments are used for C<URI> requests:
@@ -238,7 +246,8 @@ The following named arguments are used for C<URI> requests:
 
 =item uri => URI
 
-A reference to a C<URI> object
+A reference to a C<URI> object. If the scheme is C<https> then an SSL
+connection will be used.
 
 =item method => STRING
 
