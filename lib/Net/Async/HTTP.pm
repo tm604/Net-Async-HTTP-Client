@@ -171,7 +171,23 @@ sub get_connection
       return;
    }
 
-   $loop->connect(
+   my $method = "connect";
+   my %extra_args;
+
+   if( $args{SSL} ) {
+      require IO::Async::SSL;
+      IO::Async::SSL->VERSION( 0.04 );
+
+      $method = "SSL_connect";
+
+      $extra_args{on_ssl_error} = sub {
+         $on_error->( "$host:$port SSL error [$_[0]]" );
+      };
+
+      $extra_args{$_} = delete $args{$_} for grep m/^SSL_/, keys %args;
+   }
+
+   $loop->$method(
       host     => $host,
       service  => $port,
       socktype => SOCK_STREAM,
@@ -189,6 +205,8 @@ sub get_connection
 
          $self->get_connection( %args, transport => $stream );
       },
+
+      %extra_args,
    );
 }
 
@@ -312,6 +330,7 @@ sub do_request
 
    my $host;
    my $port;
+   my $ssl;
 
    my $on_header_redir = sub {
       my ( $response ) = @_;
@@ -364,6 +383,7 @@ sub do_request
    if( $args{request} ) {
       $request = delete $args{request};
       ref $request and $request->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
+      $ssl = $args{SSL};
    }
    elsif( $args{uri} ) {
       my $uri = delete $args{uri};
@@ -374,6 +394,8 @@ sub do_request
       $host = $uri->host;
       $port = $uri->port;
       my $path = $uri->path_query;
+
+      $ssl = ( $uri->scheme eq "https" );
 
       $path = "/" if $path eq "";
 
@@ -445,6 +467,7 @@ sub do_request
       $self->get_connection(
          host => $args{proxy_host} || $host,
          port => $args{proxy_port} || $port,
+         SSL  => $ssl,
 
          on_error => $on_error,
 
