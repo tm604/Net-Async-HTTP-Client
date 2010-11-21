@@ -22,6 +22,7 @@ use HTTP::Request;
 use HTTP::Request::Common qw();
 
 use IO::Async::Stream;
+use IO::Async::Loop 0.30; # for ->connect( on_stream )
 
 use Socket qw( SOCK_STREAM );
 
@@ -183,12 +184,10 @@ sub get_connection
          $on_error->( "$host:$port not contactable" );
       },
 
-      on_connected => sub {
-         my ( $sock ) = @_;
+      on_stream => sub {
+         my ( $stream ) = @_;
 
-         my $transport = IO::Async::Stream->new( handle => $sock );
-
-         $self->get_connection( %args, transport => $transport );
+         $self->get_connection( %args, transport => $stream );
       },
    );
 }
