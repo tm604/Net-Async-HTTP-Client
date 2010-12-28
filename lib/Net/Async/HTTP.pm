@@ -22,7 +22,7 @@ use HTTP::Request;
 use HTTP::Request::Common qw();
 
 use IO::Async::Stream;
-use IO::Async::Loop 0.30; # for ->connect( on_stream )
+use IO::Async::Loop 0.31; # for ->connect( extensions )
 
 use Socket qw( SOCK_STREAM );
 
@@ -175,14 +175,13 @@ sub get_connection
       return;
    }
 
-   my $method = "connect";
    my %extra_args;
 
    if( $args{SSL} ) {
       require IO::Async::SSL;
       IO::Async::SSL->VERSION( 0.04 );
 
-      $method = "SSL_connect";
+      push @{ $extra_args{extensions} }, "SSL";
 
       $extra_args{on_ssl_error} = sub {
          $on_error->( "$host:$port SSL error [$_[0]]" );
@@ -191,7 +190,7 @@ sub get_connection
       $extra_args{$_} = delete $args{$_} for grep m/^SSL_/, keys %args;
    }
 
-   $loop->$method(
+   $loop->connect(
       host     => $host,
       service  => $port,
       socktype => SOCK_STREAM,
