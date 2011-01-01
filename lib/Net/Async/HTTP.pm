@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use base qw( IO::Async::Notifier );
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 our $DEFAULT_UA = "Perl + " . __PACKAGE__ . "/$VERSION";
 our $DEFAULT_MAXREDIR = 3;
