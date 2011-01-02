@@ -28,7 +28,7 @@ use Socket qw( SOCK_STREAM );
 
 =head1 NAME
 
-C<Net::Async::HTTP> - Use HTTP with C<IO::Async>
+C<Net::Async::HTTP> - use HTTP with C<IO::Async>
 
 =head1 SYNOPSIS
 
