@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 45;
+use Test::More tests => 51;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -279,3 +279,25 @@ do_test_req( "simple POST",
    expect_res_content => "New content",
 );
 
+$req = HTTP::Request->new( PUT => "/handler", [ Host => "somewhere" ], "New content" );
+$req->protocol( "HTTP/1.1" );
+
+do_test_req( "simple PUT",
+   req => $req,
+
+   expect_req_firstline => "PUT /handler HTTP/1.1",
+   expect_req_headers => {
+      Host => "somewhere",
+      'Content-Length' => 11,
+   },
+   expect_req_content => "New content",
+
+   response => "HTTP/1.1 201 Created$CRLF" . 
+               "Content-Length: 0$CRLF" .
+               $CRLF,
+
+   expect_res_code    => 201,
+   expect_res_headers => {
+      'Content-Length' => 0,
+   },
+);
