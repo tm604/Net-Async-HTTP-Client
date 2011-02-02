@@ -113,6 +113,12 @@ be constructed that declares C<Net::Async::HTTP> and the version number.
 Optional. How many levels of redirection to follow. If not supplied, will
 default to 3. Give 0 to disable redirection entirely.
 
+=item proxy_host => STRING
+
+=item proxy_port => INT
+
+Optional. Default values to apply to each C<request> method.
+
 =back
 
 =cut
@@ -122,7 +128,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( user_agent max_redirects )) {
+   foreach (qw( user_agent max_redirects proxy_host proxy_port )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -478,8 +484,8 @@ sub do_request
       }
 
       $self->get_connection(
-         host => $args{proxy_host} || $host,
-         port => $args{proxy_port} || $port,
+         host => $args{proxy_host} || $self->{proxy_host} || $host,
+         port => $args{proxy_port} || $self->{proxy_port} || $port,
          SSL  => $ssl,
 
          on_error => $on_error,
