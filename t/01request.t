@@ -3,7 +3,8 @@
 use strict;
 use warnings;
 
-use Test::More tests => 51;
+use Test::More tests => 59;
+use Test::Identity;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -33,8 +34,10 @@ sub do_test_req
    my $response;
    my $error;
 
+   my $request = $args{req};
+
    $http->do_request(
-      request => $args{req},
+      request => $request,
       handle  => $S1,
 
       on_response => sub { $response = $_[0] },
@@ -72,6 +75,8 @@ sub do_test_req
 
    # Wait for the server to finish its response
    wait_for { defined $response or defined $error };
+
+   identical( $response->request, $request, "\$response->request is \$request for $name" );
 
    if( $args{expect_error} ) {
       ok( defined $error, "Expected error for $name" );

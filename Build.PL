@@ -16,6 +16,7 @@ my $build = Module::Build->new(
    },
    build_requires => {
       'IO::Async::Test' => 0,
+      'Test::Identity' => 0,
       'Test::More' => 0,
    },
    license => 'perl',

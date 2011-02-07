@@ -350,10 +350,13 @@ sub do_request
    my $port;
    my $ssl;
 
+   my $request;
+
    my $on_header_redir = sub {
       my ( $response ) = @_;
 
       if( !$response->is_redirect or $max_redirects == 0 ) {
+         $response->request( $request );
          return $on_header->( $response ) if $on_header;
          return sub {
             return $on_response->( $response ) unless @_;
@@ -395,8 +398,6 @@ sub do_request
          );
       }
    };
-
-   my $request;
 
    if( $args{request} ) {
       $request = delete $args{request};
