@@ -357,6 +357,8 @@ sub do_request
 
       if( !$response->is_redirect or $max_redirects == 0 ) {
          $response->request( $request );
+         $self->process_response( $response );
+
          return $on_header->( $response ) if $on_header;
          return sub {
             return $on_response->( $response ) unless @_;
@@ -450,7 +452,7 @@ sub do_request
       }
    }
 
-   $request->init_header( 'User-Agent' => $self->{user_agent} ) if length $self->{user_agent};
+   $self->prepare_request( $request );
 
    if( my $handle = $args{handle} ) { # INTERNAL UNDOCUMENTED
       my $transport = IO::Async::Stream->new( handle => $handle );
@@ -502,6 +504,40 @@ sub do_request
          },
       );
    }
+}
+
+=head1 SUBCLASS METHODS
+
+The following methods are intended as points for subclasses to override, to
+add extra functionallity.
+
+=cut
+
+=head2 $http->prepare_request( $request )
+
+Called just before the C<HTTP::Request> object is sent to the server.
+
+=cut
+
+sub prepare_request
+{
+   my $self = shift;
+   my ( $request ) = @_;
+
+   $request->init_header( 'User-Agent' => $self->{user_agent} ) if length $self->{user_agent};
+}
+
+=head2 $http->process_response( $response )
+
+Called after a non-redirect C<HTTP::Response> has been received from a server.
+The originating request will be set in the object.
+
+=cut
+
+sub process_response
+{
+   my $self = shift;
+   my ( $response ) = @_;
 }
 
 # Keep perl happy; keep Britain tidy
