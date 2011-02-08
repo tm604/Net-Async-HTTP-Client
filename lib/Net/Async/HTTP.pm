@@ -119,6 +119,11 @@ default to 3. Give 0 to disable redirection entirely.
 
 Optional. Default values to apply to each C<request> method.
 
+=item cookie_jar => HTTP::Cookies
+
+Optional. A reference to a L<HTTP::Cookies> object. Will be used to set
+cookies in requests and store them from responses.
+
 =back
 
 =cut
@@ -128,7 +133,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( user_agent max_redirects proxy_host proxy_port )) {
+   foreach (qw( user_agent max_redirects proxy_host proxy_port cookie_jar )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -525,6 +530,7 @@ sub prepare_request
    my ( $request ) = @_;
 
    $request->init_header( 'User-Agent' => $self->{user_agent} ) if length $self->{user_agent};
+   $self->{cookie_jar}->add_cookie_header( $request ) if $self->{cookie_jar};
 }
 
 =head2 $http->process_response( $response )
@@ -538,6 +544,8 @@ sub process_response
 {
    my $self = shift;
    my ( $response ) = @_;
+
+   $self->{cookie_jar}->extract_cookies( $response ) if $self->{cookie_jar};
 }
 
 # Keep perl happy; keep Britain tidy
