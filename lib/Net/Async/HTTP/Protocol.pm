@@ -29,6 +29,35 @@ internally by L<Net::Async::HTTP>. It is not intended for general use.
 
 =cut
 
+sub connect
+{
+   my $self = shift;
+   $self->SUPER::connect(
+      @_,
+
+      on_connected => sub {
+         my $self = shift;
+
+         if( my $queue = delete $self->{on_ready_queue} ) {
+            $_->( $self ) for @$queue;
+         }
+      },
+   );
+}
+
+sub run_when_ready
+{
+   my $self = shift;
+   my ( $on_ready ) = @_;
+
+   if( $self->transport ) {
+      $on_ready->( $self );
+   }
+   else {
+      push @{ $self->{on_ready_queue} }, $on_ready;
+   }
+}
+
 sub on_read
 {
    my $self = shift;

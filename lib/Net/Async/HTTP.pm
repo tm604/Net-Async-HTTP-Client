@@ -163,7 +163,7 @@ sub get_connection
    my $connections = $self->{connections};
 
    if( my $conn = $connections->{"$host:$port"} ) {
-      $on_ready->( $conn );
+      $conn->run_when_ready( $on_ready );
       return;
    }
 
@@ -199,12 +199,10 @@ sub get_connection
          $on_error->( "$host:$port not contactable" );
       },
 
-      on_connected => sub {
-         $on_ready->( $conn );
-      },
-
       %args,
    );
+
+   $conn->run_when_ready( $on_ready );
 }
 
 =head2 $http->do_request( %args )
