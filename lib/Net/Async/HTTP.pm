@@ -542,11 +542,6 @@ sub process_response
    $self->{cookie_jar}->extract_cookies( $response ) if $self->{cookie_jar};
 }
 
-# Keep perl happy; keep Britain tidy
-1;
-
-__END__
-
 =head1 SEE ALSO
 
 =over 4
@@ -560,3 +555,7 @@ L<http://tools.ietf.org/html/rfc2616> - Hypertext Transfer Protocol -- HTTP/1.1
 =head1 AUTHOR
 
 Paul Evans <leonerd@leonerd.org.uk>
+
+=cut
+
+0x55AA;

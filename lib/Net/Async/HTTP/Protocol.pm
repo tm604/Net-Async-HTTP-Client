@@ -235,11 +235,10 @@ sub request
    push @{ $self->{on_read_queue} }, $on_read;
 }
 
-# Keep perl happy; keep Britain tidy
-1;
-
-__END__
-
 =head1 AUTHOR
 
 Paul Evans <leonerd@leonerd.org.uk>
+
+=cut
+
+0x55AA;
