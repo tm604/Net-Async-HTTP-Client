@@ -94,7 +94,7 @@ sub _init
 {
    my $self = shift;
 
-   $self->{connections} = {}; # { "$host:$port" } -> [ $conn, @pending_onread ]
+   $self->{connections} = {}; # { "$host:$port" } -> $conn
 }
 
 =head1 PARAMETERS
@@ -160,15 +160,12 @@ sub get_connection
    my $host = delete $args{host};
    my $port = delete $args{port};
 
-   if( my $cr = $self->{connections}->{"$host:$port"} ) {
-      my ( $conn ) = @$cr;
+   my $connections = $self->{connections};
 
+   if( my $conn = $connections->{"$host:$port"} ) {
       $on_ready->( $conn );
-
       return;
    }
-
-   my $connections = $self->{connections};
 
    my $conn = Net::Async::HTTP::Protocol->new(
       on_closed => sub {
@@ -177,7 +174,7 @@ sub get_connection
    );
    $self->add_child( $conn );
 
-   $connections->{"$host:$port"} = [ $conn ];
+   $connections->{"$host:$port"} = $conn;
 
    if( $args{SSL} ) {
       require IO::Async::SSL;
@@ -203,7 +200,6 @@ sub get_connection
       },
 
       on_connected => sub {
-
          $on_ready->( $conn );
       },
 
