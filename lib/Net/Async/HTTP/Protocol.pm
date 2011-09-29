@@ -208,9 +208,27 @@ sub request
       }
    };
 
-   # HTTP::Request is silly and uses "\n" as a separator. We must tell it to
-   # use the correct RFC 2616-compliant CRLF sequence.
-   $self->write( $req->as_string( $CRLF ) );
+   # Unless the request method is CONNECT, the URL is not allowed to contain
+   # an authority; only path
+   # Take a copy of the headers since we'll be hacking them up
+   my $headers = $req->headers->clone;
+   my $path;
+   if( $method eq "CONNECT" ) {
+      $path = $req->uri->as_string;
+   }
+   else {
+      my $uri = $req->uri;
+      $path = $uri->path_query;
+      $path = "/$path" unless $path =~ m{^/};
+      $headers->init_header( Host => $uri->authority );
+   }
+
+   my @headers = ( "$method $path " . $req->protocol );
+   $headers->scan( sub { push @headers, "$_[0]: $_[1]" } );
+
+   $self->write( join( $CRLF, @headers ) .
+                 $CRLF . $CRLF .
+                 $req->content );
 
    $self->write( $request_body ) if $request_body;
 
