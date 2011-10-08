@@ -338,9 +338,10 @@ sub do_request
    my $self = shift;
    my %args = @_;
 
-   my $on_response  = $args{on_response} or
-      my $on_header = $args{on_header}   or croak "Expected 'on_response' or 'on_header' as CODE ref";
-   my $on_error     = $args{on_error}    or croak "Expected 'on_error' as a CODE ref";
+   my ( $on_response, $on_header );
+   $on_response  = $args{on_response} or
+      $on_header = $args{on_header}   or croak "Expected 'on_response' or 'on_header' as CODE ref";
+   my $on_error     = $args{on_error} or croak "Expected 'on_error' as a CODE ref";
    my $request_body = $args{request_body};
 
    my $max_redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
