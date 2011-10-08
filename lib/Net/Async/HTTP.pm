@@ -372,7 +372,7 @@ sub do_request
 
          my $location = $response->header( "Location" );
 
-         if( $location =~ m{^http://} ) {
+         if( $location =~ m{^http(?:s?)://} ) {
             # skip
          }
          elsif( $location =~ m{^/} ) {
