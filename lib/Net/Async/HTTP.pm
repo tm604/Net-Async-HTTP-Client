@@ -161,20 +161,21 @@ sub get_connection
    my $port = delete $args{port};
 
    my $connections = $self->{connections};
+   my $key = "$host:$port";
 
-   if( my $conn = $connections->{"$host:$port"} ) {
+   if( my $conn = $connections->{$key} ) {
       $conn->run_when_ready( $on_ready );
       return;
    }
 
    my $conn = Net::Async::HTTP::Protocol->new(
       on_closed => sub {
-         delete $connections->{"$host:$port"};
+         delete $connections->{$key};
       },
    );
    $self->add_child( $conn );
 
-   $connections->{"$host:$port"} = $conn;
+   $connections->{$key} = $conn;
 
    if( $args{SSL} ) {
       require IO::Async::SSL;
@@ -183,6 +184,7 @@ sub get_connection
       push @{ $args{extensions} }, "SSL";
 
       $args{on_ssl_error} = sub {
+         delete $connections->{$key};
          $on_error->( "$host:$port SSL error [$_[0]]" );
       };
    }
@@ -192,10 +194,12 @@ sub get_connection
       service  => $port,
 
       on_resolve_error => sub {
+         delete $connections->{$key};
          $on_error->( "$host:$port not resolvable [$_[0]]" );
       },
 
       on_connect_error => sub {
+         delete $connections->{$key};
          $on_error->( "$host:$port not contactable" );
       },
 
