@@ -17,6 +17,7 @@ our $DEFAULT_MAXREDIR = 3;
 use Carp;
 
 use Net::Async::HTTP::Protocol;
+use Net::Async::HTTP::Timer;
 
 use HTTP::Request;
 use HTTP::Request::Common qw();
@@ -333,6 +334,12 @@ URL.
 Optional. How many levels of redirection to follow. If not supplied, will
 default to the value given in the constructor.
 
+=item timeout => NUM
+
+Optional. Specifies a timeout in seconds, after which to give up on the
+request and fail it with an error. If this happens, the error message will be
+C<Timed out>.
+
 =back
 
 =cut
@@ -349,12 +356,42 @@ sub do_request
    my $request_body = $args{request_body};
 
    my $max_redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
+   my $timeout       = defined $args{timeout}       ? $args{timeout}       : $self->{timeout};
 
    my $host;
    my $port;
    my $ssl;
 
+   my $timer = $args{timer};
+   if( !$timer and defined $timeout ) {
+      $timer = Net::Async::HTTP::Timer->new( delay => $timeout );
+      $self->add_child( $timer );
+      $timer->start;
+
+      my $inner_on_response = $on_response;
+      $on_response = sub {
+         $timer->stop;
+         $self->remove_child( $timer );
+         goto $inner_on_response;
+      };
+
+      my $inner_on_error = $on_error;
+      $on_error = sub {
+         $timer->stop;
+         $self->remove_child( $timer );
+         goto $inner_on_error;
+      };
+
+      $args{timer} = $timer;
+   }
+
    my $on_header_redir = sub {
+      return if $timer and $timer->expired;
+
+      $timer->set_on_expire( sub {
+         $on_error->( "Timed out" );
+      } ) if $timer;
+
       my ( $response ) = @_;
 
       if( !$response->is_redirect or $max_redirects == 0 ) {
@@ -476,6 +513,11 @@ sub do_request
                on_header => $on_header_redir,
                on_error  => $on_error,
             );
+
+            $timer->set_on_expire( sub {
+               $conn->error_all( "Timed out" );
+               $conn->close;
+            } ) if $timer;
          },
       );
    }
@@ -497,12 +539,19 @@ sub do_request
 
          on_ready => sub {
             my ( $conn ) = @_;
+            return if $timer and $timer->expired;
+
             $conn->request(
                request => $request,
                request_body => $request_body,
                on_header => $on_header_redir,
                on_error  => $on_error,
             );
+
+            $timer->set_on_expire( sub {
+               $conn->error_all( "Timed out" );
+               $conn->close;
+            } ) if $timer;
          },
       );
    }

@@ -18,6 +18,10 @@ use HTTP::Response;
 
 my $CRLF = "\x0d\x0a"; # More portable than \r\n
 
+# Indices into responder_queue elements
+use constant ON_READ  => 0;
+use constant ON_ERROR => 1;
+
 =head1 NAME
 
 C<Net::Async::HTTP::Protocol> - HTTP client protocol handler
@@ -63,17 +67,17 @@ sub on_read
    my $self = shift;
    my ( $buffref, $closed ) = @_;
 
-   if( my $on_read = $self->{on_read_queue}[0] ) {
-      my $ret = $on_read->( $self, @_ );
+   if( my $head = $self->{responder_queue}[0] ) {
+      my $ret = $head->[ON_READ]->( $self, $buffref, $closed );
 
       if( defined $ret ) {
          return $ret if !ref $ret;
 
-         $self->{on_read_queue}[0] = $ret;
+         $head->[ON_READ] = $ret;
          return 1;
       }
 
-      shift @{ $self->{on_read_queue} };
+      shift @{ $self->{responder_queue} };
       return 1 if !$closed and length $$buffref;
       return;
    }
@@ -82,6 +86,15 @@ sub on_read
    return if $closed or !length $$buffref;
 
    croak "Spurious on_read of connection while idle\n";
+}
+
+sub error_all
+{
+   my $self = shift;
+
+   while( my $head = shift @{ $self->{responder_queue} } ) {
+      $head->[ON_ERROR]->( @_ );
+   }
 }
 
 sub request
@@ -244,7 +257,7 @@ sub request
 
    $self->write( $request_body ) if $request_body;
 
-   push @{ $self->{on_read_queue} }, $on_read;
+   push @{ $self->{responder_queue} }, [ $on_read, $on_error ];
 }
 
 =head1 AUTHOR
