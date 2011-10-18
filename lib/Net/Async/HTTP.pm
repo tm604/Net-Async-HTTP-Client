@@ -354,13 +354,10 @@ sub do_request
    my $port;
    my $ssl;
 
-   my $request;
-
    my $on_header_redir = sub {
       my ( $response ) = @_;
 
       if( !$response->is_redirect or $max_redirects == 0 ) {
-         $response->request( $request );
          $self->process_response( $response );
 
          return $on_header->( $response ) if $on_header;
@@ -405,6 +402,7 @@ sub do_request
       }
    };
 
+   my $request;
    if( $args{request} ) {
       $request = delete $args{request};
       ref $request and $request->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";

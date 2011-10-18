@@ -101,6 +101,7 @@ sub request
       }
 
       my $header = HTTP::Response->parse( $1 );
+      $header->request( $req );
 
       my $on_body_chunk = $on_header->( $header );
 
