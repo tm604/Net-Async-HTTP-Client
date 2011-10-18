@@ -63,8 +63,19 @@ sub on_read
    my $self = shift;
    my ( $buffref, $closed ) = @_;
 
-   if( my $on_read = shift @{ $self->{on_read_queue} } ) {
-      return $on_read;
+   if( my $on_read = $self->{on_read_queue}[0] ) {
+      my $ret = $on_read->( $self, @_ );
+
+      if( defined $ret ) {
+         return $ret if !ref $ret;
+
+         $self->{on_read_queue}[0] = $ret;
+         return 1;
+      }
+
+      shift @{ $self->{on_read_queue} };
+      return 1 if !$closed and length $$buffref;
+      return;
    }
 
    # Reinvoked after switch back to baseline, but may be idle again
