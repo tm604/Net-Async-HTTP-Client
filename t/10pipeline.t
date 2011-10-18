@@ -38,7 +38,7 @@ sub do_uris
          handle  => $S1,
 
          on_response => sub { $on_resp->( @_ ); delete $wait{$id} },
-         on_error    => sub { die "Test failed early - $!" },
+         on_error    => sub { die "Test failed early - $_[-1]" },
       );
 
       $wait_id++;
