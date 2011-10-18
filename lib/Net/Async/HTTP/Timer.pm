@@ -4,7 +4,12 @@
 #  (C) Paul Evans, 2011 -- leonerd@leonerd.org.uk
 
 package Net::Async::HTTP::Timer;
+
+use strict;
+use warnings;
 use base qw( IO::Async::Timer::Countdown );
+
+our $VERSION = '0.13';
 
 # TODO: Make these (or something like them) methods on a real
 # IO::Async::Timer::Countdown
