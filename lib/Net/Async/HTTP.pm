@@ -114,6 +114,11 @@ be constructed that declares C<Net::Async::HTTP> and the version number.
 Optional. How many levels of redirection to follow. If not supplied, will
 default to 3. Give 0 to disable redirection entirely.
 
+=item timeout => NUM
+
+Optional. How long in seconds to wait before giving up on a request. If not
+supplied then no default will be applied, and no timeout will take place.
+
 =item proxy_host => STRING
 
 =item proxy_port => INT
@@ -134,7 +139,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( user_agent max_redirects proxy_host proxy_port cookie_jar )) {
+   foreach (qw( user_agent max_redirects timeout proxy_host proxy_port cookie_jar )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
