@@ -31,6 +31,8 @@ $http->do_request(
    uri => URI->new( "http://my.server/doc" ),
    handle => $S1,
 
+   timeout => 10,
+
    on_response => sub { $response = $_[0] },
    on_redirect => sub { ( $redir_response, $location ) = @_ },
    on_error    => sub { die "Test died early - $_[0]" },
@@ -81,6 +83,8 @@ is( $response->content, "Document", 'Content of final response' );
 $http->do_request(
    uri => URI->new( "http://my.server/somedir" ),
    handle => $S1,
+
+   timeout => 10,
 
    on_response => sub { $response = $_[0] },
    on_redirect => sub { ( $redir_response, $location ) = @_ },

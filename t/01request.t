@@ -40,6 +40,8 @@ sub do_test_req
       request => $request,
       handle  => $S1,
 
+      timeout => 10,
+
       on_response => sub { $response = $_[0] },
       on_error    => sub { $error    = $_[0] },
    );
