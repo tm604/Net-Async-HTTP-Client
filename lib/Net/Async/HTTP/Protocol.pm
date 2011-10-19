@@ -120,12 +120,17 @@ sub request
       my ( $self, $buffref, $closed ) = @_;
 
       unless( $$buffref =~ s/^(.*?$CRLF$CRLF)//s ) {
-         $on_error->( "Connection closed while awaiting header" ) if $closed;
+         if( $closed ) {
+            $self->debug_printf( "ERROR closed" );
+            $on_error->( "Connection closed while awaiting header" );
+         }
          return 0;
       }
 
       my $header = HTTP::Response->parse( $1 );
       $header->request( $req );
+
+      $self->debug_printf( "HEADER %s", $header->status_line );
 
       my $on_body_chunk = $on_header->( $header );
 
@@ -134,6 +139,7 @@ sub request
       # RFC 2616 says "HEAD" does not have a body, nor do any 1xx codes, nor
       # 204 (No Content) nor 304 (Not Modified)
       if( $method eq "HEAD" or $code =~ m/^1..$/ or $code eq "204" or $code eq "304" ) {
+         $self->debug_printf( "BODY done" );
          $on_body_chunk->();
          return undef; # Finished
       }
@@ -158,7 +164,10 @@ sub request
                return sub {
                   my ( $self, $buffref, $closed ) = @_;
 
-                  $on_error->( "Connection closed while awaiting chunk trailer" ) if $closed;
+                  if( $closed ) {
+                     $self->debug_printf( "ERROR closed" );
+                     $on_error->( "Connection closed while awaiting chunk trailer" );
+                  }
 
                   $$buffref =~ s/^(.*)$CRLF// or return 0;
                   $trailer .= $1;
@@ -167,6 +176,7 @@ sub request
 
                   # TODO: Actually use the trailer
 
+                  $self->debug_printf( "BODY done" );
                   $on_body_chunk->();
                   return undef; # Finished
                }
@@ -179,6 +189,7 @@ sub request
                undef $chunk_length;
 
                unless( $$buffref =~ s/^$CRLF// ) {
+                  $self->debug_printf( "ERROR chunk without CRLF" );
                   $on_error->( "Chunk of size $chunk_length wasn't followed by CRLF" );
                   $self->close;
                }
@@ -188,12 +199,16 @@ sub request
                return 1;
             }
 
-            $on_error->( "Connection closed while awaiting chunk" ) if $closed;
+            if( $closed ) {
+               $self->debug_printf( "ERROR closed" );
+               $on_error->( "Connection closed while awaiting chunk" );
+            }
             return 0;
          };
       }
       elsif( defined $content_length ) {
          if( $content_length == 0 ) {
+            $self->debug_printf( "BODY done" );
             $on_body_chunk->();
             return undef; # Finished
          }
@@ -209,11 +224,15 @@ sub request
             $content_length -= length $content;
 
             if( $content_length == 0 ) {
+               $self->debug_printf( "BODY done" );
                $on_body_chunk->();
                return undef;
             }
 
-            $on_error->( "Connection closed while awaiting body" ) if $closed;
+            if( $closed ) {
+               $self->debug_printf( "ERROR closed" );
+               $on_error->( "Connection closed while awaiting body" );
+            }
             return 0;
          };
       }
@@ -226,6 +245,7 @@ sub request
 
             return 0 unless $closed;
 
+            $self->debug_printf( "BODY done" );
             $on_body_chunk->();
             # $self already closed
             return undef;
