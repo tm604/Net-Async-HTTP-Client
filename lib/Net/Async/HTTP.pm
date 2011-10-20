@@ -175,6 +175,7 @@ sub get_connection
    }
 
    my $conn = Net::Async::HTTP::Protocol->new(
+      notifier_name => $key,
       on_closed => sub {
          delete $connections->{$key};
       },
@@ -502,12 +503,15 @@ sub do_request
    if( my $handle = $args{handle} ) { # INTERNAL UNDOCUMENTED
       my $transport = IO::Async::Stream->new( handle => $handle );
 
+      my $fileno = $handle->fileno;
+      $timer->configure( notifier_name => "[[local_io_handle]]:$fileno/..." ) if $timer;
+
       $self->get_connection(
          transport => $transport,
 
          # To make the connection cache logic happy
          host => "[[local_io_handle]]",
-         port => $handle->fileno,
+         port => $fileno,
 
          on_error => $on_error,
 
@@ -535,6 +539,8 @@ sub do_request
       if( !defined $port ) {
          $port = delete $args{port} or croak "Expected 'port'";
       }
+
+      $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
 
       $self->get_connection(
          host => $args{proxy_host} || $self->{proxy_host} || $host,
