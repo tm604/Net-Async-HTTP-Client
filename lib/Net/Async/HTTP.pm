@@ -232,9 +232,12 @@ A reference to an C<HTTP::Request> object
 
 =item host => STRING
 
-=item port => INT
+Hostname of the server to connect to
 
-Hostname and port number of the server to connect to
+=item port => INT or STRING
+
+Optional. Port number or service of the server to connect to. If not defined,
+will default to C<http> or C<https> depending on whether SSL is being used.
 
 =item SSL => BOOL
 
@@ -537,7 +540,7 @@ sub do_request
       }
 
       if( !defined $port ) {
-         $port = delete $args{port} or croak "Expected 'port'";
+         $port = delete $args{port} || ( $ssl ? "https" : "http" );
       }
 
       $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
