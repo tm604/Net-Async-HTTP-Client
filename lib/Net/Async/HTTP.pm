@@ -77,20 +77,6 @@ C<https> scheme, or by passing the a true value as the C<SSL> parameter.
 
 =cut
 
-sub new
-{
-   my $class = shift;
-   my %args = @_;
-
-   my $loop = delete $args{loop};
-
-   my $self = $class->SUPER::new( %args );
-
-   $loop->add( $self ) if $loop;
-
-   return $self;
-}
-
 sub _init
 {
    my $self = shift;
