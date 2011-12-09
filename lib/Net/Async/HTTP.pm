@@ -489,73 +489,40 @@ sub do_request
 
    $self->prepare_request( $request );
 
-   if( my $handle = $args{handle} ) { # INTERNAL UNDOCUMENTED
-      my $transport = IO::Async::Stream->new( handle => $handle );
-
-      my $fileno = $handle->fileno;
-      $timer->configure( notifier_name => "[[local_io_handle]]:$fileno/..." ) if $timer;
-
-      $self->get_connection(
-         transport => $transport,
-
-         # To make the connection cache logic happy
-         host => "[[local_io_handle]]",
-         port => $fileno,
-
-         on_error => $on_error,
-
-         on_ready => sub {
-            my ( $conn ) = @_;
-            $conn->request(
-               request => $request,
-               request_body => $request_body,
-               on_header => $on_header_redir,
-               on_error  => $on_error,
-            );
-
-            $timer->set_on_expire( sub {
-               $conn->error_all( "Timed out" );
-               $conn->close;
-            } ) if $timer;
-         },
-      );
+   if( !defined $host ) {
+      $host = delete $args{host} or croak "Expected 'host'";
    }
-   else {
-      if( !defined $host ) {
-         $host = delete $args{host} or croak "Expected 'host'";
-      }
 
-      if( !defined $port ) {
-         $port = delete $args{port} || ( $ssl ? "https" : "http" );
-      }
-
-      $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
-
-      $self->get_connection(
-         host => $args{proxy_host} || $self->{proxy_host} || $host,
-         port => $args{proxy_port} || $self->{proxy_port} || $port,
-         SSL  => $ssl,
-
-         on_error => $on_error,
-
-         on_ready => sub {
-            my ( $conn ) = @_;
-            return if $timer and $timer->expired;
-
-            $conn->request(
-               request => $request,
-               request_body => $request_body,
-               on_header => $on_header_redir,
-               on_error  => $on_error,
-            );
-
-            $timer->set_on_expire( sub {
-               $conn->error_all( "Timed out" );
-               $conn->close;
-            } ) if $timer;
-         },
-      );
+   if( !defined $port ) {
+      $port = delete $args{port} || ( $ssl ? "https" : "http" );
    }
+
+   $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
+
+   $self->get_connection(
+      host => $args{proxy_host} || $self->{proxy_host} || $host,
+      port => $args{proxy_port} || $self->{proxy_port} || $port,
+      SSL  => $ssl,
+
+      on_error => $on_error,
+
+      on_ready => sub {
+         my ( $conn ) = @_;
+         return if $timer and $timer->expired;
+
+         $conn->request(
+            request => $request,
+            request_body => $request_body,
+            on_header => $on_header_redir,
+            on_error  => $on_error,
+         );
+
+         $timer->set_on_expire( sub {
+            $conn->error_all( "Timed out" );
+            $conn->close;
+         } ) if $timer;
+      },
+   );
 }
 
 =head1 SUBCLASS METHODS
