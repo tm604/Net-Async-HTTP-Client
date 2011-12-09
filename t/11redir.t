@@ -20,17 +20,31 @@ my $http = Net::Async::HTTP->new(
 
 $loop->add( $http );
 
-{
-   my ( $S1, $S2 ) = $loop->socketpair() or die "Cannot create socket pair - $!";
+my $peersock;
 
+{
    my $redir_response;
    my $location;
 
    my $response;
 
+   no warnings 'redefine';
+   local *Net::Async::HTTP::Protocol::connect = sub {
+      my $self = shift;
+      my %args = @_;
+
+      $args{host}    eq "my.server" or die "Expected $args{host} eq my.server";
+      $args{service} eq "80"        or die "Expected $args{service} eq 80";
+
+      ( my $selfsock, $peersock ) = $self->loop->socketpair() or die "Cannot create socket pair - $!";
+
+      $self->IO::Async::Protocol::connect(
+         transport => IO::Async::Stream->new( handle => $selfsock )
+      );
+   };
+
    $http->do_request(
       uri => URI->new( "http://my.server/doc" ),
-      handle => $S1,
 
       timeout => 10,
 
@@ -40,7 +54,7 @@ $loop->add( $http );
    );
 
    my $request_stream = "";
-   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $S2 => $request_stream;
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
 
    $request_stream =~ s/^(.*)$CRLF//;
    my $req_firstline = $1;
@@ -50,17 +64,17 @@ $loop->add( $http );
    # Trim headers
    $request_stream =~ s/^(.*)$CRLF$CRLF//s;
 
-   $S2->syswrite( "HTTP/1.1 301 Moved Permanently$CRLF" .
-                  "Content-Length: 0$CRLF" .
-                  "Location: http://my.server/get_doc?name=doc$CRLF" .
-                  "$CRLF" );
+   $peersock->syswrite( "HTTP/1.1 301 Moved Permanently$CRLF" .
+                        "Content-Length: 0$CRLF" .
+                        "Location: http://my.server/get_doc?name=doc$CRLF" .
+                        "$CRLF" );
 
    wait_for { defined $location };
 
    is( $location, "http://my.server/get_doc?name=doc", 'Redirect happens' );
 
    $request_stream = "";
-   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $S2 => $request_stream;
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
 
    $request_stream =~ s/^(.*)$CRLF//;
    $req_firstline = $1;
@@ -70,11 +84,11 @@ $loop->add( $http );
    # Trim headers
    $request_stream =~ s/^(.*)$CRLF$CRLF//s;
 
-   $S2->syswrite( "HTTP/1.1 200 OK$CRLF" .
-                  "Content-Length: 8$CRLF".
-                  "Content-Type: text/plain$CRLF" .
-                  "$CRLF" .
-                  "Document" );
+   $peersock->syswrite( "HTTP/1.1 200 OK$CRLF" .
+                        "Content-Length: 8$CRLF".
+                        "Content-Type: text/plain$CRLF" .
+                        "$CRLF" .
+                        "Document" );
 
    wait_for { defined $response };
 
@@ -83,16 +97,28 @@ $loop->add( $http );
 }
 
 {
-   my ( $S1, $S2 ) = $loop->socketpair() or die "Cannot create socket pair - $!";
-
    my $redir_response;
    my $location;
 
    my $response;
 
+   no warnings 'redefine';
+   local *Net::Async::HTTP::Protocol::connect = sub {
+      my $self = shift;
+      my %args = @_;
+
+      $args{host}    eq "my.server" or die "Expected $args{host} eq my.server";
+      $args{service} eq "80"        or die "Expected $args{service} eq 80";
+
+      ( my $selfsock, $peersock ) = $self->loop->socketpair() or die "Cannot create socket pair - $!";
+
+      $self->IO::Async::Protocol::connect(
+         transport => IO::Async::Stream->new( handle => $selfsock )
+      );
+   };
+
    $http->do_request(
       uri => URI->new( "http://my.server/somedir" ),
-      handle => $S1,
 
       timeout => 10,
 
@@ -102,7 +128,7 @@ $loop->add( $http );
    );
 
    my $request_stream = "";
-   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $S2 => $request_stream;
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
 
    $request_stream =~ s/^(.*)$CRLF//;
    my $req_firstline = $1;
@@ -112,10 +138,10 @@ $loop->add( $http );
    # Trim headers
    $request_stream =~ s/^(.*)$CRLF$CRLF//s;
 
-   $S2->syswrite( "HTTP/1.1 301 Moved Permanently$CRLF" .
-                  "Content-Length: 0$CRLF" .
-                  "Location: /somedir/$CRLF" .
-                  "$CRLF" );
+   $peersock->syswrite( "HTTP/1.1 301 Moved Permanently$CRLF" .
+                        "Content-Length: 0$CRLF" .
+                        "Location: /somedir/$CRLF" .
+                        "$CRLF" );
 
    undef $location;
    wait_for { defined $location };
@@ -123,7 +149,7 @@ $loop->add( $http );
    is( $location, "http://my.server/somedir/", 'Local redirect happens' );
 
    $request_stream = "";
-   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $S2 => $request_stream;
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
 
    $request_stream =~ s/^(.*)$CRLF//;
    $req_firstline = $1;
@@ -133,11 +159,11 @@ $loop->add( $http );
    # Trim headers
    $request_stream =~ s/^(.*)$CRLF$CRLF//s;
 
-   $S2->syswrite( "HTTP/1.1 200 OK$CRLF" .
-                  "Content-Length: 9$CRLF".
-                  "Content-Type: text/plain$CRLF" .
-                  "$CRLF" .
-                  "Directory" );
+   $peersock->syswrite( "HTTP/1.1 200 OK$CRLF" .
+                        "Content-Length: 9$CRLF".
+                        "Content-Type: text/plain$CRLF" .
+                        "$CRLF" .
+                        "Directory" );
 
    undef $response;
    wait_for { defined $response };

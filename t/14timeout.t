@@ -18,15 +18,26 @@ my $http = Net::Async::HTTP->new();
 
 $loop->add( $http );
 
-{
-   my ( $S1, $S2 ) = $loop->socketpair() or die "Cannot create socket pair - $!";
+my $peersock;
 
+no warnings 'redefine';
+local *Net::Async::HTTP::Protocol::connect = sub {
+   my $self = shift;
+   my %args = @_;
+
+   ( my $selfsock, $peersock ) = $self->loop->socketpair() or die "Cannot create socket pair - $!";
+
+   $self->IO::Async::Protocol::connect(
+      transport => IO::Async::Stream->new( handle => $selfsock )
+   );
+};
+
+{
    my $errcount;
    my $error;
 
    $http->do_request(
       uri => URI->new( "http://my.server/doc" ),
-      handle => $S1,
 
       timeout => 1, # Really quick for testing
 
@@ -41,14 +52,11 @@ $loop->add( $http );
 }
 
 {
-   my ( $S1, $S2 ) = $loop->socketpair() or die "Cannot create socket pair - $!";
-
    my $errcount;
    my $error;
 
    $http->do_request(
       uri => URI->new( "http://my.server/redir" ),
-      handle => $S1,
 
       timeout => 1, # Really quick for testing
 
@@ -57,14 +65,14 @@ $loop->add( $http );
    );
 
    my $request_stream = "";
-   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $S2 => $request_stream;
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
 
    $request_stream =~ s/^(.*)$CRLF//;
 
-   $S2->syswrite( "HTTP/1.1 301 Moved Permanently$CRLF" .
-                  "Content-Length: 0$CRLF" .
-                  "Location: http://my.server/get_doc?name=doc$CRLF" .
-                  "$CRLF" );
+   $peersock->syswrite( "HTTP/1.1 301 Moved Permanently$CRLF" .
+                        "Content-Length: 0$CRLF" .
+                        "Location: http://my.server/get_doc?name=doc$CRLF" .
+                        "$CRLF" );
 
    wait_for { defined $error };
 
@@ -73,14 +81,11 @@ $loop->add( $http );
 }
 
 {
-   my ( $S1, $S2 ) = $loop->socketpair() or die "Cannot create socket pair - $!";
-
    my $error;
    my $errcount;
 
    $http->do_request(
       uri => URI->new( "http://my.server/first" ),
-      handle => $S1,
 
       timeout => 1, # Really quick for testing
 
@@ -93,7 +98,6 @@ $loop->add( $http );
 
    $http->do_request(
       uri => URI->new( "http://my.server/second" ),
-      handle => $S1,
 
       timeout => 3,
 

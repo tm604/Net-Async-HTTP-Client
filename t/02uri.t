@@ -22,15 +22,29 @@ $loop->add( $http );
 
 # Most of this function copypasted from t/01http-req.t
 
+my $peersock;
+
 sub do_test_uri
 {
    my $name = shift;
    my %args = @_;
 
-   my ( $S1, $S2 ) = $loop->socketpair() or die "Cannot create socket pair - $!";
-
    my $response;
    my $error;
+
+   no warnings 'redefine';
+   local *Net::Async::HTTP::Protocol::connect = sub {
+      my $self = shift;
+      my %args = @_;
+
+      $args{service} eq "80" or die "Expected $args{service} eq 80";
+
+      ( my $selfsock, $peersock ) = $self->loop->socketpair() or die "Cannot create socket pair - $!";
+
+      $self->IO::Async::Protocol::connect(
+         transport => IO::Async::Stream->new( handle => $selfsock )
+      );
+   };
 
    $http->do_request(
       uri     => $args{uri},
@@ -39,7 +53,6 @@ sub do_test_uri
       pass    => $args{pass},
       content => $args{content},
       content_type => $args{content_type},
-      handle  => $S1,
 
       on_response => sub { $response = $_[0] },
       on_error    => sub { $error    = $_[0] },
@@ -47,7 +60,7 @@ sub do_test_uri
 
    # Wait for the client to send its request
    my $request_stream = "";
-   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $S2 => $request_stream;
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
 
    $request_stream =~ s/^(.*)$CRLF//;
    my $req_firstline = $1;
@@ -71,8 +84,8 @@ sub do_test_uri
       is( $req_content, $args{expect_req_content}, "Request content for $name" );
    }
 
-   $S2->syswrite( $args{response} );
-   $S2->close if $args{close_after_response};
+   $peersock->syswrite( $args{response} );
+   $peersock->close if $args{close_after_response};
 
    # Wait for the server to finish its response
    wait_for { defined $response or defined $error };

@@ -24,21 +24,37 @@ isa_ok( $http, "Net::Async::HTTP", '$http isa Net::Async::HTTP' );
 
 $loop->add( $http );
 
+my $peersock;
+
 sub do_test_req
 {
    my $name = shift;
    my %args = @_;
 
-   my ( $S1, $S2 ) = $loop->socketpair() or die "Cannot create socket pair - $!";
-
    my $response;
    my $error;
 
    my $request = $args{req};
+   my $host    = $args{host};
+
+   no warnings 'redefine';
+   local *Net::Async::HTTP::Protocol::connect = sub {
+      my $self = shift;
+      my %args = @_;
+
+      $args{host}    eq $host  or die "Expected $args{host} eq $host";
+      $args{service} eq "http" or die "Expected $args{service} eq http";
+
+      ( my $selfsock, $peersock ) = $self->loop->socketpair() or die "Cannot create socket pair - $!";
+
+      $self->IO::Async::Protocol::connect(
+         transport => IO::Async::Stream->new( handle => $selfsock )
+      );
+   };
 
    $http->do_request(
       request => $request,
-      handle  => $S1,
+      host    => $host,
 
       timeout => 10,
 
@@ -48,7 +64,7 @@ sub do_test_req
 
    # Wait for the client to send its request
    my $request_stream = "";
-   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $S2 => $request_stream;
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
 
    $request_stream =~ s/^(.*)$CRLF//;
    my $req_firstline = $1;
@@ -72,8 +88,8 @@ sub do_test_req
       is( $req_content, $args{expect_req_content}, "Request content for $name" );
    }
 
-   $S2->syswrite( $args{response} );
-   $S2->close if $args{close_after_response};
+   $peersock->syswrite( $args{response} );
+   $peersock->close if $args{close_after_response};
 
    # Wait for the server to finish its response
    wait_for { defined $response or defined $error };
@@ -113,6 +129,7 @@ $req->protocol( "HTTP/1.1");
 
 do_test_req( "simple HEAD",
    req => $req,
+   host => "myhost",
 
    expect_req_firstline => "HEAD /some/path HTTP/1.1",
    expect_req_headers => {
@@ -137,6 +154,7 @@ $req->protocol( "HTTP/1.1" );
 
 do_test_req( "simple GET",
    req => $req,
+   host => "myhost",
 
    expect_req_firstline => "GET /some/path HTTP/1.1",
    expect_req_headers => {
@@ -162,6 +180,7 @@ $req->protocol( "HTTP/1.1" );
 
 do_test_req( "GET to full URL",
    req => $req,
+   host => "myhost",
 
    expect_req_firstline => "GET /some/path HTTP/1.1",
    expect_req_headers => {
@@ -187,6 +206,7 @@ $req->protocol( "HTTP/1.1" );
 
 do_test_req( "GET with empty body",
    req => $req,
+   host => "myhost",
 
    expect_req_firstline => "GET /empty HTTP/1.1",
    expect_req_headers => {
@@ -211,6 +231,7 @@ $req->protocol( "HTTP/1.1" );
 
 do_test_req( "GET not found",
    req => $req,
+   host => "somewhere",
 
    expect_req_firstline => "GET /somethingmissing HTTP/1.1",
    expect_req_headers => {
@@ -235,6 +256,7 @@ $req->protocol( "HTTP/1.1" );
 
 do_test_req( "GET chunks",
    req => $req,
+   host => "somewhere",
 
    expect_req_firstline => "GET /stream HTTP/1.1",
    expect_req_headers => {
@@ -265,6 +287,7 @@ $req->protocol( "HTTP/1.1" );
 
 do_test_req( "GET unspecified length",
    req => $req,
+   host => "somewhere",
 
    expect_req_firstline => "GET /untileof HTTP/1.1",
    expect_req_headers => {
@@ -289,6 +312,7 @@ $req->protocol( "HTTP/1.1" );
 
 do_test_req( "simple POST",
    req => $req,
+   host => "somewhere",
 
    expect_req_firstline => "POST /handler HTTP/1.1",
    expect_req_headers => {
@@ -316,6 +340,7 @@ $req->protocol( "HTTP/1.1" );
 
 do_test_req( "simple PUT",
    req => $req,
+   host => "somewhere",
 
    expect_req_firstline => "PUT /handler HTTP/1.1",
    expect_req_headers => {
