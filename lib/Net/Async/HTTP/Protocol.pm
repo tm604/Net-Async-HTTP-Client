@@ -129,6 +129,7 @@ sub request
 
       my $header = HTTP::Response->parse( $1 );
       $header->request( $req );
+      $header->previous( $args{previous_response} ) if $args{previous_response};
 
       $self->debug_printf( "HEADER %s", $header->status_line );
 

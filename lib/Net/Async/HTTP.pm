@@ -431,6 +431,7 @@ sub do_request
             %args,
             uri => $loc_uri,
             max_redirects => $max_redirects - 1,
+            previous_response => $response,
          );
       }
    };
@@ -513,6 +514,7 @@ sub do_request
          $conn->request(
             request => $request,
             request_body => $request_body,
+            previous_response => $args{previous_response},
             on_header => $on_header_redir,
             on_error  => $on_error,
          );

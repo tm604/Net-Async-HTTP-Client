@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 10;
+use Test::More tests => 12;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -94,6 +94,11 @@ my $peersock;
 
    is( $response->content_type, "text/plain", 'Content type of final response' );
    is( $response->content, "Document", 'Content of final response' );
+
+   isa_ok( $response->previous, "HTTP::Response", '$response->previous' );
+
+   my $previous = $response->previous;
+   is( $previous->request->uri, "/doc", 'Previous request URI' );
 }
 
 {
