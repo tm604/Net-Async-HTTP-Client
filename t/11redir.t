@@ -20,21 +20,20 @@ my $http = Net::Async::HTTP->new(
 
 $loop->add( $http );
 
-my $peersock;
-
 {
    my $redir_response;
    my $location;
 
    my $response;
 
+   my $peersock;
    no warnings 'redefine';
    local *Net::Async::HTTP::Protocol::connect = sub {
       my $self = shift;
       my %args = @_;
 
-      $args{host}    eq "my.server" or die "Expected $args{host} eq my.server";
-      $args{service} eq "80"        or die "Expected $args{service} eq 80";
+      $args{host}    eq "host0" or die "Expected $args{host} eq host0";
+      $args{service} eq "80"    or die "Expected $args{service} eq 80";
 
       ( my $selfsock, $peersock ) = $self->loop->socketpair() or die "Cannot create socket pair - $!";
 
@@ -44,7 +43,7 @@ my $peersock;
    };
 
    $http->do_request(
-      uri => URI->new( "http://my.server/doc" ),
+      uri => URI->new( "http://host0/doc" ),
 
       timeout => 10,
 
@@ -66,12 +65,12 @@ my $peersock;
 
    $peersock->syswrite( "HTTP/1.1 301 Moved Permanently$CRLF" .
                         "Content-Length: 0$CRLF" .
-                        "Location: http://my.server/get_doc?name=doc$CRLF" .
+                        "Location: http://host0/get_doc?name=doc$CRLF" .
                         "$CRLF" );
 
    wait_for { defined $location };
 
-   is( $location, "http://my.server/get_doc?name=doc", 'Redirect happens' );
+   is( $location, "http://host0/get_doc?name=doc", 'Redirect happens' );
 
    $request_stream = "";
    wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
@@ -107,13 +106,14 @@ my $peersock;
 
    my $response;
 
+   my $peersock;
    no warnings 'redefine';
    local *Net::Async::HTTP::Protocol::connect = sub {
       my $self = shift;
       my %args = @_;
 
-      $args{host}    eq "my.server" or die "Expected $args{host} eq my.server";
-      $args{service} eq "80"        or die "Expected $args{service} eq 80";
+      $args{host}    eq "host1" or die "Expected $args{host} eq host1";
+      $args{service} eq "80"    or die "Expected $args{service} eq 80";
 
       ( my $selfsock, $peersock ) = $self->loop->socketpair() or die "Cannot create socket pair - $!";
 
@@ -123,7 +123,7 @@ my $peersock;
    };
 
    $http->do_request(
-      uri => URI->new( "http://my.server/somedir" ),
+      uri => URI->new( "http://host1/somedir" ),
 
       timeout => 10,
 
@@ -151,7 +151,7 @@ my $peersock;
    undef $location;
    wait_for { defined $location };
 
-   is( $location, "http://my.server/somedir/", 'Local redirect happens' );
+   is( $location, "http://host1/somedir/", 'Local redirect happens' );
 
    $request_stream = "";
    wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;

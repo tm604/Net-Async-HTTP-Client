@@ -24,7 +24,7 @@ isa_ok( $http, "Net::Async::HTTP", '$http isa Net::Async::HTTP' );
 
 $loop->add( $http );
 
-my $peersock;
+my $hostnum = 0;
 
 sub do_test_req
 {
@@ -35,8 +35,9 @@ sub do_test_req
    my $error;
 
    my $request = $args{req};
-   my $host    = $args{host};
+   my $host    = "host$hostnum"; $hostnum++;
 
+   my $peersock;
    no warnings 'redefine';
    local *Net::Async::HTTP::Protocol::connect = sub {
       my $self = shift;
@@ -61,6 +62,8 @@ sub do_test_req
       on_response => sub { $response = $_[0] },
       on_error    => sub { $error    = $_[0] },
    );
+
+   wait_for { $peersock };
 
    # Wait for the client to send its request
    my $request_stream = "";
@@ -129,7 +132,6 @@ $req->protocol( "HTTP/1.1");
 
 do_test_req( "simple HEAD",
    req => $req,
-   host => "myhost",
 
    expect_req_firstline => "HEAD /some/path HTTP/1.1",
    expect_req_headers => {
