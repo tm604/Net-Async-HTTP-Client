@@ -248,6 +248,11 @@ sub request
 
             return 0 unless $closed;
 
+            # TODO: IO::Async probably ought to do this. We need to fire the
+            # on_closed event _before_ calling on_body_chunk, to clear the
+            # connection cache in case another request comes - e.g. HEAD->GET
+            $self->close;
+
             $self->debug_printf( "BODY done" );
             $on_body_chunk->();
             # $self already closed
