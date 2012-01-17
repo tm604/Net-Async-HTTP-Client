@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 12;
+use Test::More tests => 18;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -21,6 +21,10 @@ my $http = Net::Async::HTTP->new(
 $loop->add( $http );
 
 foreach my $close ( 0, 1 ) {
+   # We'll run an almost-identical test twice, with different server responses.
+   # 0 == keepalive
+   # 1 == close
+
    my $peersock;
    my $connections = 0;
 
@@ -67,17 +71,25 @@ foreach my $close ( 0, 1 ) {
                         ( $close ? "Connection: close$CRLF" : "Connection: Keep-Alive$CRLF" ) .
                         "$CRLF" .
                         "1st" );
-   $peersock->close if $close;
+   $peersock->close, undef $peersock if $close;
 
    undef $response;
    wait_for { defined $response };
 
    is( $response->content, "1st", 'Content of first response' );
 
+   my $inner_response;
    $http->do_request(
       uri => URI->new( "http://host$close/second" ),
 
-      on_response => sub { $response = $_[0] },
+      on_response => sub {
+         $response = $_[0];
+         $http->do_request(
+            uri => URI->new( "http://host$close/inner" ),
+            on_response => sub { $inner_response = $_[0] },
+            on_error    => sub { die "Test died early - $_[0]" },
+         );
+      },
       on_error    => sub { die "Test died early - $_[0]" },
    );
 
@@ -104,10 +116,39 @@ foreach my $close ( 0, 1 ) {
                         ( $close ? "Connection: close$CRLF" : "Connection: Keep-Alive$CRLF" ) .
                         "$CRLF" .
                         "2nd" );
-   $peersock->close if $close;
+   $peersock->close, undef $peersock if $close;
 
    undef $response;
    wait_for { defined $response };
 
-   is( $response->content, "2nd", 'Content of first response' );
+   is( $response->content, "2nd", 'Content of second response' );
+
+   wait_for { $peersock };
+
+   if( $close ) {
+      is( $connections, 3, '->connect called again for inner request to same server' );
+   }
+   else {
+      is( $connections, 1, '->connect not called again for inner request to same server' );
+   }
+
+   $request_stream = "";
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
+
+   $request_stream =~ s/^(.*)$CRLF//;
+   $req_firstline = $1;
+
+   is( $req_firstline, "GET /inner HTTP/1.1", 'First line for inner request' );
+
+   $peersock->syswrite( "HTTP/1.1 200 OK$CRLF" .
+                        "Content-Length: 3$CRLF" .
+                        ( $close ? "Connection: close$CRLF" : "Connection: Keep-Alive$CRLF" ) .
+                        "$CRLF" .
+                        "2nd" );
+   $peersock->close if $close;
+
+   undef $inner_response;
+   wait_for { defined $inner_response };
+
+   is( $inner_response->content, "2nd", 'Content of inner response' );
 }
