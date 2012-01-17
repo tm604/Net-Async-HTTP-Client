@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 6;
+use Test::More tests => 12;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -20,7 +20,7 @@ my $http = Net::Async::HTTP->new(
 
 $loop->add( $http );
 
-{
+foreach my $close ( 0, 1 ) {
    my $peersock;
    my $connections = 0;
 
@@ -31,8 +31,8 @@ $loop->add( $http );
 
       $connections++;
 
-      $args{host}    eq "host0" or die "Expected $args{host} eq host0";
-      $args{service} eq "80"    or die "Expected $args{service} eq 80";
+      $args{host}    eq "host$close" or die "Expected $args{host} eq host$close";
+      $args{service} eq "80"         or die "Expected $args{service} eq 80";
 
       ( my $selfsock, $peersock ) = $self->loop->socketpair() or die "Cannot create socket pair - $!";
 
@@ -44,7 +44,7 @@ $loop->add( $http );
    my $response;
 
    $http->do_request(
-      uri => URI->new( "http://host0/first" ),
+      uri => URI->new( "http://host$close/first" ),
 
       on_response => sub { $response = $_[0] },
       on_error    => sub { die "Test died early - $_[0]" },
@@ -64,9 +64,10 @@ $loop->add( $http );
    $peersock->syswrite( "HTTP/1.1 200 OK$CRLF" .
                         "Content-Length: 3$CRLF" .
                         "Content-Type: text/plain$CRLF" .
-                        "Connection: Keep-Alive$CRLF" .
+                        ( $close ? "Connection: close$CRLF" : "Connection: Keep-Alive$CRLF" ) .
                         "$CRLF" .
                         "1st" );
+   $peersock->close if $close;
 
    undef $response;
    wait_for { defined $response };
@@ -74,13 +75,20 @@ $loop->add( $http );
    is( $response->content, "1st", 'Content of first response' );
 
    $http->do_request(
-      uri => URI->new( "http://host0/second" ),
+      uri => URI->new( "http://host$close/second" ),
 
       on_response => sub { $response = $_[0] },
       on_error    => sub { die "Test died early - $_[0]" },
    );
 
-   is( $connections, 1, '->connect not called again for second request to same server' );
+   wait_for { $peersock };
+
+   if( $close ) {
+      is( $connections, 2, '->connect called again for second request to same server' );
+   }
+   else {
+      is( $connections, 1, '->connect not called again for second request to same server' );
+   }
 
    $request_stream = "";
    wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
@@ -93,9 +101,10 @@ $loop->add( $http );
    $peersock->syswrite( "HTTP/1.1 200 OK$CRLF" .
                         "Content-Length: 3$CRLF" .
                         "Content-Type: text/plain$CRLF" .
-                        "Connection: Keep-Alive$CRLF" .
+                        ( $close ? "Connection: close$CRLF" : "Connection: Keep-Alive$CRLF" ) .
                         "$CRLF" .
                         "2nd" );
+   $peersock->close if $close;
 
    undef $response;
    wait_for { defined $response };
