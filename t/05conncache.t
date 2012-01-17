@@ -64,6 +64,7 @@ $loop->add( $http );
    $peersock->syswrite( "HTTP/1.1 200 OK$CRLF" .
                         "Content-Length: 3$CRLF" .
                         "Content-Type: text/plain$CRLF" .
+                        "Connection: Keep-Alive$CRLF" .
                         "$CRLF" .
                         "1st" );
 
@@ -92,6 +93,7 @@ $loop->add( $http );
    $peersock->syswrite( "HTTP/1.1 200 OK$CRLF" .
                         "Content-Length: 3$CRLF" .
                         "Content-Type: text/plain$CRLF" .
+                        "Connection: Keep-Alive$CRLF" .
                         "$CRLF" .
                         "2nd" );
 
