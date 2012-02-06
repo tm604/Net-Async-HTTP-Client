@@ -136,17 +136,18 @@ sub request
       my $on_body_chunk = $on_header->( $header );
 
       my $code = $header->code;
+      my $connection_close = lc( $header->header( "Connection" ) || "close" ) eq "close";
 
       # RFC 2616 says "HEAD" does not have a body, nor do any 1xx codes, nor
       # 204 (No Content) nor 304 (Not Modified)
       if( $method eq "HEAD" or $code =~ m/^1..$/ or $code eq "204" or $code eq "304" ) {
          $self->debug_printf( "BODY done" );
+         $self->close if $connection_close;
          $on_body_chunk->();
          return undef; # Finished
       }
 
       my $transfer_encoding = $header->header( "Transfer-Encoding" );
-      my $connection        = lc( $header->header( "Connection" ) || "close" );
       my $content_length    = $header->content_length;
 
       if( defined $transfer_encoding and $transfer_encoding eq "chunked" ) {
@@ -231,7 +232,7 @@ sub request
 
             if( $content_length == 0 ) {
                $self->debug_printf( "BODY done" );
-               $self->close if $connection eq "close";
+               $self->close if $connection_close;
                $on_body_chunk->();
                return undef;
             }
