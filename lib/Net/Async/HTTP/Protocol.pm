@@ -150,6 +150,8 @@ sub request
       my $content_length    = $header->content_length;
 
       if( defined $transfer_encoding and $transfer_encoding eq "chunked" ) {
+         $self->debug_printf( "BODY chunks" );
+
          my $chunk_length;
 
          return sub {
@@ -209,6 +211,8 @@ sub request
          };
       }
       elsif( defined $content_length ) {
+         $self->debug_printf( "BODY length $content_length" );
+
          if( $content_length == 0 ) {
             $self->debug_printf( "BODY done" );
             $on_body_chunk->();
@@ -240,6 +244,8 @@ sub request
          };
       }
       else {
+         $self->debug_printf( "BODY until EOF" );
+
          return sub {
             my ( $self, $buffref, $closed ) = @_;
 
