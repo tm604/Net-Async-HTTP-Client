@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2008-2011 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2008-2012 -- leonerd@leonerd.org.uk
 
 package Net::Async::HTTP;
 
@@ -116,6 +116,10 @@ Optional. Default values to apply to each C<request> method.
 Optional. A reference to a L<HTTP::Cookies> object. Will be used to set
 cookies in requests and store them from responses.
 
+=item pipeline => BOOL
+
+Optional. If false, disables HTTP/1.1-style request pipelining.
+
 =back
 
 =cut
@@ -125,14 +129,15 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( user_agent max_redirects timeout proxy_host proxy_port cookie_jar )) {
+   foreach (qw( user_agent max_redirects timeout proxy_host proxy_port cookie_jar pipeline )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
    $self->SUPER::configure( %params );
 
-   defined $self->{user_agent}    or $self->{user_agent} = $DEFAULT_UA;
+   defined $self->{user_agent}    or $self->{user_agent}    = $DEFAULT_UA;
    defined $self->{max_redirects} or $self->{max_redirects} = $DEFAULT_MAXREDIR;
+   defined $self->{pipeline}      or $self->{pipeline}      = 1;
 }
 
 =head1 METHODS
@@ -162,6 +167,7 @@ sub get_connection
 
    my $conn = Net::Async::HTTP::Protocol->new(
       notifier_name => $key,
+      pipeline => $self->{pipeline},
       on_closed => sub {
          delete $connections->{$key};
       },

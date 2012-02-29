@@ -38,20 +38,63 @@ internally by L<Net::Async::HTTP>. It is not intended for general use.
 
 =cut
 
+sub _init
+{
+   my $self = shift;
+
+   $self->{outstanding_requests} = 0;
+}
+
+sub configure
+{
+   my $self = shift;
+   my %params = @_;
+
+   foreach (qw( pipeline )) {
+      $self->{$_} = delete $params{$_} if exists $params{$_};
+   }
+
+   $self->SUPER::configure( %params );
+}
+
 sub connect
 {
    my $self = shift;
    $self->SUPER::connect(
       @_,
 
-      on_connected => sub {
-         my $self = shift;
-
-         if( my $queue = delete $self->{on_ready_queue} ) {
-            $_->( $self ) for @$queue;
-         }
-      },
+      on_connected => $self->can('ready'),
    );
+}
+
+sub ready
+{
+   my $self = shift;
+
+   my $queue = $self->{on_ready_queue} or return;
+
+   if( $self->{pipeline} ) {
+      $self->debug_printf( "READY pipelined" );
+      $self->{on_ready_queue} = [];
+      $_->( $self ) for @$queue;
+   }
+   elsif( @$queue ) {
+      $self->debug_printf( "READY non-pipelined" );
+      ( shift @$queue )->( $self );
+   }
+}
+
+sub is_idle
+{
+   my $self = shift;
+   return $self->{outstanding_requests} == 0;
+}
+
+sub _request_done
+{
+   my $self = shift;
+   $self->{outstanding_requests}--;
+   $self->ready;
 }
 
 sub run_when_ready
@@ -59,7 +102,7 @@ sub run_when_ready
    my $self = shift;
    my ( $on_ready ) = @_;
 
-   if( $self->transport ) {
+   if( $self->transport and ( $self->{pipeline} or $self->is_idle ) ) {
       $on_ready->( $self );
    }
    else {
@@ -160,6 +203,7 @@ sub request
          $self->debug_printf( "BODY done" );
          $self->close if $connection_close;
          $on_body_chunk->();
+         $self->_request_done;
          return undef; # Finished
       }
 
@@ -199,6 +243,7 @@ sub request
 
                   $self->debug_printf( "BODY done" );
                   $on_body_chunk->();
+                  $self->_request_done;
                   return undef; # Finished
                }
             }
@@ -250,6 +295,7 @@ sub request
                $self->debug_printf( "BODY done" );
                $self->close if $connection_close;
                $on_body_chunk->();
+               $self->_request_done;
                return undef;
             }
 
@@ -279,6 +325,7 @@ sub request
             $self->debug_printf( "BODY done" );
             $on_body_chunk->();
             # $self already closed
+            $self->_request_done;
             return undef;
          };
       }
@@ -307,6 +354,8 @@ sub request
                  $req->content );
 
    $self->write( $request_body ) if $request_body;
+
+   $self->{outstanding_requests}++;
 
    push @{ $self->{responder_queue} }, [ $on_read, $on_error ];
 }

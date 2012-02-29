@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 3;
+use Test::More tests => 9;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -14,18 +14,18 @@ my $CRLF = "\x0d\x0a"; # because \r\n isn't portable
 my $loop = IO::Async::Loop->new();
 testing_loop( $loop );
 
-my $http = Net::Async::HTTP->new();
-
-$loop->add( $http );
+my $pipeline;
 
 # Most of this function copypasted from t/01http-req.t
-
-my $peersock;
-
 sub do_uris
 {
    my %wait;
    my $wait_id = 0;
+
+   my $http = Net::Async::HTTP->new( pipeline => $pipeline );
+   $loop->add( $http );
+
+   my $peersock;
 
    no warnings 'redefine';
    local *Net::Async::HTTP::Protocol::connect = sub {
@@ -71,6 +71,10 @@ sub do_uris
       $request_stream =~ s/^(.*?)$CRLF$CRLF//s;
       my %req_headers = map { m/^(.*?):\s+(.*)$/g } split( m/$CRLF/, $1 );
 
+      if( !$pipeline ) {
+         is( length $request_stream, 0, 'Stream is idle after request with pipeline disabled' );
+      }
+
       my $req_content;
       if( defined( my $len = $req_headers{'Content-Length'} ) ) {
          wait_for { length( $request_stream ) >= $len };
@@ -92,19 +96,26 @@ sub do_uris
       # Wait for the server to finish its response
       wait_for { keys %wait < $waitcount };
    }
+
+   $loop->remove( $http );
 }
 
-do_uris(
-   URI->new( "http://server/path/1" ) => sub {
-      my ( $req ) = @_;
-      is( $req->content, "GET /path/1 HTTP/1.1", 'First of three pipeline' );
-   },
-   URI->new( "http://server/path/2" ) => sub {
-      my ( $req ) = @_;
-      is( $req->content, "GET /path/2 HTTP/1.1", 'Second of three pipeline' );
-   },
-   URI->new( "http://server/path/3" ) => sub {
-      my ( $req ) = @_;
-      is( $req->content, "GET /path/3 HTTP/1.1", 'Third of three pipeline' );
-   },
-);
+# foreach $pipeline doesn't quite work as expected
+foreach ( 1, 0 ) {
+   $pipeline = $_;
+
+   do_uris(
+      URI->new( "http://server/path/1" ) => sub {
+         my ( $req ) = @_;
+         is( $req->content, "GET /path/1 HTTP/1.1", 'First of three pipeline' );
+      },
+      URI->new( "http://server/path/2" ) => sub {
+         my ( $req ) = @_;
+         is( $req->content, "GET /path/2 HTTP/1.1", 'Second of three pipeline' );
+      },
+      URI->new( "http://server/path/3" ) => sub {
+         my ( $req ) = @_;
+         is( $req->content, "GET /path/3 HTTP/1.1", 'Third of three pipeline' );
+      },
+   );
+}
