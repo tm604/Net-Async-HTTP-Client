@@ -106,10 +106,11 @@ local *Net::Async::HTTP::Protocol::connect = sub {
       on_error    => sub { $errcount2++; $error2 = $_[0] },
    );
 
-   wait_for { defined $error and defined $error2 };
-
+   wait_for { defined $error };
    like( $error, qr/^Timed out/, 'Received timeout error from pipeline' );
    is( $errcount, 1, 'on_error invoked once from pipeline' );
+
+   wait_for { defined $error2 };
    like( $error2, qr/^Timed out/, 'Received timeout error from pipeline(2)' );
    is( $errcount2, 1, 'on_error invoked once from pipeline(2)' );
 }

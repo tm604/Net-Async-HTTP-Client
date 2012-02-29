@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 9;
+use Test::More tests => 16;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -14,7 +14,7 @@ my $CRLF = "\x0d\x0a"; # because \r\n isn't portable
 my $loop = IO::Async::Loop->new();
 testing_loop( $loop );
 
-my $pipeline;
+my $test_mode;
 
 # Most of this function copypasted from t/01http-req.t
 sub do_uris
@@ -22,7 +22,7 @@ sub do_uris
    my %wait;
    my $wait_id = 0;
 
-   my $http = Net::Async::HTTP->new( pipeline => $pipeline );
+   my $http = Net::Async::HTTP->new( pipeline => not( $test_mode eq "no_pipeline" ) );
    $loop->add( $http );
 
    my $peersock;
@@ -60,6 +60,7 @@ sub do_uris
    }
 
    my $request_stream = "";
+   my $not_first = 0;
 
    while( keys %wait ) {
       # Wait for the client to send its request
@@ -71,8 +72,11 @@ sub do_uris
       $request_stream =~ s/^(.*?)$CRLF$CRLF//s;
       my %req_headers = map { m/^(.*?):\s+(.*)$/g } split( m/$CRLF/, $1 );
 
-      if( !$pipeline ) {
-         is( length $request_stream, 0, 'Stream is idle after request with pipeline disabled' );
+      if( $test_mode ne "pipeline" ) {
+         is( length $request_stream, 0, "Stream is idle after request for $test_mode" );
+      }
+      elsif( keys %wait > 1 && $not_first++ ) {
+         ok( length $request_stream > 0, "Stream is not idle after non-initial, non-final request for $test_mode" );
       }
 
       my $req_content;
@@ -87,7 +91,10 @@ sub do_uris
 
       my $body = "$req_firstline";
 
-      $peersock->syswrite( "HTTP/1.1 200 OK$CRLF" . 
+      my $protocol = "HTTP/1.1";
+      $protocol = "HTTP/1.0" if $test_mode eq "http/1.0";
+
+      $peersock->syswrite( "$protocol 200 OK$CRLF" . 
                            "Content-Length: " . length( $body ) . $CRLF .
                            "Connection: Keep-Alive$CRLF" .
                            $CRLF .
@@ -100,22 +107,22 @@ sub do_uris
    $loop->remove( $http );
 }
 
-# foreach $pipeline doesn't quite work as expected
-foreach ( 1, 0 ) {
-   $pipeline = $_;
+# foreach $test_mode doesn't quite work as expected
+foreach (qw( pipeline no_pipeline http/1.0 )) {
+   $test_mode = $_;
 
    do_uris(
       URI->new( "http://server/path/1" ) => sub {
          my ( $req ) = @_;
-         is( $req->content, "GET /path/1 HTTP/1.1", 'First of three pipeline' );
+         is( $req->content, "GET /path/1 HTTP/1.1", "First of three pipeline for $test_mode" );
       },
       URI->new( "http://server/path/2" ) => sub {
          my ( $req ) = @_;
-         is( $req->content, "GET /path/2 HTTP/1.1", 'Second of three pipeline' );
+         is( $req->content, "GET /path/2 HTTP/1.1", "Second of three pipeline for $test_mode" );
       },
       URI->new( "http://server/path/3" ) => sub {
          my ( $req ) = @_;
-         is( $req->content, "GET /path/3 HTTP/1.1", 'Third of three pipeline' );
+         is( $req->content, "GET /path/3 HTTP/1.1", "Third of three pipeline for $test_mode" );
       },
    );
 }

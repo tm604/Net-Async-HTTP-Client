@@ -18,8 +18,10 @@ use HTTP::Response;
 
 my $CRLF = "\x0d\x0a"; # More portable than \r\n
 
-# Indices into responder_queue elements
+# Indices into responder/ready queue elements
+# Honestly, these would be much neater with Futures...
 use constant ON_READ  => 0;
+use constant ON_READY => 0;
 use constant ON_ERROR => 1;
 
 # Detect whether HTTP::Message properly trims whitespace in header values. If
@@ -57,6 +59,12 @@ sub configure
    $self->SUPER::configure( %params );
 }
 
+sub should_pipeline
+{
+   my $self = shift;
+   return $self->{pipeline} && $self->{can_pipeline};
+}
+
 sub connect
 {
    my $self = shift;
@@ -73,14 +81,14 @@ sub ready
 
    my $queue = $self->{on_ready_queue} or return;
 
-   if( $self->{pipeline} ) {
+   if( $self->should_pipeline ) {
       $self->debug_printf( "READY pipelined" );
       $self->{on_ready_queue} = [];
-      $_->( $self ) for @$queue;
+      $_->[ON_READY]->( $self ) for @$queue;
    }
    elsif( @$queue ) {
       $self->debug_printf( "READY non-pipelined" );
-      ( shift @$queue )->( $self );
+      ( shift @$queue )->[ON_READY]->( $self );
    }
 }
 
@@ -100,13 +108,13 @@ sub _request_done
 sub run_when_ready
 {
    my $self = shift;
-   my ( $on_ready ) = @_;
+   my ( $on_ready, $on_error ) = @_;
 
-   if( $self->transport and ( $self->{pipeline} or $self->is_idle ) ) {
+   if( $self->transport and ( $self->should_pipeline or $self->is_idle ) ) {
       $on_ready->( $self );
    }
    else {
-      push @{ $self->{on_ready_queue} }, $on_ready;
+      push @{ $self->{on_ready_queue} }, [ $on_ready, $on_error ];
    }
 }
 
@@ -141,6 +149,10 @@ sub error_all
    my $self = shift;
 
    while( my $head = shift @{ $self->{responder_queue} } ) {
+      $head->[ON_ERROR]->( @_ );
+   }
+
+   while( my $head = shift @{ $self->{on_ready_queue} } ) {
       $head->[ON_ERROR]->( @_ );
    }
 }
@@ -185,6 +197,11 @@ sub request
             push @headers, $name => $value;
          } );
          $header->header( @headers );
+      }
+
+      my $protocol = $header->protocol;
+      if( $protocol =~ m{^HTTP/1\.(\d+)$} and $1 >= 1 ) {
+         $self->{can_pipeline} = 1;
       }
 
       $header->request( $req );

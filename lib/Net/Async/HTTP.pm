@@ -161,7 +161,7 @@ sub get_connection
    my $key = "$host:$port";
 
    if( my $conn = $connections->{$key} ) {
-      $conn->run_when_ready( $on_ready );
+      $conn->run_when_ready( $on_ready, $on_error );
       return;
    }
 
@@ -205,7 +205,7 @@ sub get_connection
       %args,
    );
 
-   $conn->run_when_ready( $on_ready );
+   $conn->run_when_ready( $on_ready, $on_error );
 }
 
 =head2 $http->do_request( %args )
