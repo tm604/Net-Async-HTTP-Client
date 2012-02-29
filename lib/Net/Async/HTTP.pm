@@ -120,6 +120,18 @@ cookies in requests and store them from responses.
 
 Optional. If false, disables HTTP/1.1-style request pipelining.
 
+=item local_host => STRING
+
+=item local_port => INT
+
+=item local_addrs => ARRAY
+
+=item local_addr => HASH or ARRAY
+
+Optional. Parameters to pass on to the C<connect> method used to connect
+sockets to HTTP servers. Sets the local socket address to C<bind()> to. For
+more detail, see the documentation in L<IO::Async::Connector>.
+
 =back
 
 =cut
@@ -129,7 +141,8 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( user_agent max_redirects timeout proxy_host proxy_port cookie_jar pipeline )) {
+   foreach (qw( user_agent max_redirects timeout proxy_host proxy_port cookie_jar pipeline
+                local_host local_port local_addrs local_addr )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -203,6 +216,8 @@ sub get_connection
       },
 
       %args,
+
+      ( map { defined $self->{$_} ? ( $_ => $self->{$_} ) : () } qw( local_host local_port local_addrs local_addr ) ),
    );
 
    $conn->run_when_ready( $on_ready, $on_error );
