@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 4;
+use Test::More tests => 3;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -93,13 +93,6 @@ sub do_uris
       wait_for { keys %wait < $waitcount };
    }
 }
-
-do_uris(
-   URI->new( "http://server/path/single" ) => sub {
-      my ( $req ) = @_;
-      is( $req->content, "GET /path/single HTTP/1.1", 'Single request' );
-   },
-);
 
 do_uris(
    URI->new( "http://server/path/1" ) => sub {
