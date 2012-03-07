@@ -27,6 +27,8 @@ use IO::Async::Loop 0.31; # for ->connect( extensions )
 
 use Socket qw( SOCK_STREAM );
 
+use Scalar::Util qw( weaken );
+
 =head1 NAME
 
 C<Net::Async::HTTP> - use HTTP with C<IO::Async>
@@ -386,23 +388,27 @@ sub do_request
       $timer->start;
 
       my $inner_on_response = $on_response;
-      $on_response = sub {
+      $on_response = $self->_capture_weakself( sub {
+         my $self = shift;
          $timer->stop;
          $self->remove_child( $timer );
          goto $inner_on_response;
-      };
+      } );
 
       my $inner_on_error = $on_error;
-      $on_error = sub {
+      $on_error = $self->_capture_weakself( sub {
+         my $self = shift;
          $timer->stop;
          $self->remove_child( $timer );
          goto $inner_on_error;
-      };
+      } );
 
-      $args{timer} = $timer;
+      weaken( $args{timer} = $timer );
+      weaken $timer;
    }
 
-   my $on_header_redir = sub {
+   my $on_header_redir = $self->_capture_weakself( sub {
+      my $self = shift;
       return if $timer and $timer->expired;
 
       $timer->set_on_expire( sub {
@@ -455,7 +461,7 @@ sub do_request
             previous_response => $response,
          );
       }
-   };
+   } );
 
    my $request;
    if( $args{request} ) {
