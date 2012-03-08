@@ -27,8 +27,6 @@ use IO::Async::Loop 0.31; # for ->connect( extensions )
 
 use Socket qw( SOCK_STREAM );
 
-use Scalar::Util qw( weaken );
-
 use constant HTTP_PORT  => 80;
 use constant HTTPS_PORT => 443;
 
@@ -405,9 +403,6 @@ sub do_request
          $self->remove_child( $timer );
          goto $inner_on_error;
       } );
-
-      weaken( $args{timer} = $timer );
-      weaken $timer;
    }
 
    my $on_header_redir = $self->_capture_weakself( sub {
