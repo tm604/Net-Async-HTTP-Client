@@ -214,7 +214,7 @@ sub get_connection
 
       on_connect_error => sub {
          delete $connections->{$key};
-         $on_error->( "$host:$port not contactable" );
+         $on_error->( "$host:$port not contactable [$_[-1]]" );
       },
 
       %args,
