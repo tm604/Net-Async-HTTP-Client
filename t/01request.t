@@ -43,8 +43,8 @@ sub do_test_req
       my $self = shift;
       my %args = @_;
 
-      $args{host}    eq $host  or die "Expected $args{host} eq $host";
-      $args{service} eq "http" or die "Expected $args{service} eq http";
+      $args{host}    eq $host or die "Expected $args{host} eq $host";
+      $args{service} eq "80"  or die "Expected $args{service} eq 80";
 
       ( my $selfsock, $peersock ) = $self->loop->socketpair() or die "Cannot create socket pair - $!";
 

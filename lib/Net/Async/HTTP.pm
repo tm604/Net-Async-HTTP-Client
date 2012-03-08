@@ -29,6 +29,9 @@ use Socket qw( SOCK_STREAM );
 
 use Scalar::Util qw( weaken );
 
+use constant HTTP_PORT  => 80;
+use constant HTTPS_PORT => 443;
+
 =head1 NAME
 
 C<Net::Async::HTTP> - use HTTP with C<IO::Async>
@@ -438,7 +441,7 @@ sub do_request
             # skip
          }
          elsif( $location =~ m{^/} ) {
-            my $hostport = ( $port != URI::http->default_port ) ? "$host:$port" : $host;
+            my $hostport = ( $port != HTTP_PORT ) ? "$host:$port" : $host;
             $location = "http://$hostport" . $location;
          }
          else {
@@ -522,7 +525,7 @@ sub do_request
    }
 
    if( !defined $port ) {
-      $port = delete $args{port} || ( $ssl ? "https" : "http" );
+      $port = delete $args{port} || ( $ssl ? HTTPS_PORT : HTTP_PORT );
    }
 
    $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
