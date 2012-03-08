@@ -76,7 +76,10 @@ sub do_uris
          is( length $request_stream, 0, "Stream is idle after request for $test_mode" );
       }
       elsif( keys %wait > 1 && $not_first++ ) {
-         ok( length $request_stream > 0, "Stream is not idle after non-initial, non-final request for $test_mode" );
+         # Just in case it wasn't flushed yet, wait for another request to be
+         # written anyway before we respond to this one
+         wait_for_stream { length $request_stream } $peersock => $request_stream;
+         ok( length $request_stream > 0, "Stream is not idle after middle request for $test_mode" );
       }
 
       my $req_content;
