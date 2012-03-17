@@ -363,7 +363,8 @@ sub request
       $headers->init_header( Host => $uri->authority );
    }
 
-   my @headers = ( "$method $path " . $req->protocol );
+   my $protocol = $req->protocol || "HTTP/1.1";
+   my @headers = ( "$method $path $protocol" );
    $headers->scan( sub { push @headers, "$_[0]: $_[1]" } );
 
    $self->write( join( $CRLF, @headers ) .
