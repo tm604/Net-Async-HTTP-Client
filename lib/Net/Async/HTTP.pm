@@ -465,7 +465,15 @@ sub do_request
    if( $args{request} ) {
       $request = delete $args{request};
       ref $request and $request->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
+
       $ssl = $args{SSL};
+
+      my $uri = $request->uri;
+      if( defined $uri->scheme and $uri->scheme =~ m/^http(s?)$/ ) {
+         $host = $uri->host if !defined $host;
+         $port = $uri->port if !defined $port;
+         $ssl = ( $uri->scheme eq "https" );
+      }
    }
    elsif( $args{uri} ) {
       my $uri = delete $args{uri};
