@@ -378,8 +378,8 @@ sub do_request
    my $max_redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
    my $timeout       = defined $args{timeout}       ? $args{timeout}       : $self->{timeout};
 
-   my $host;
-   my $port;
+   my $host = delete $args{host};
+   my $port = delete $args{port};
    my $ssl;
 
    my $timer = $args{timer};
@@ -515,13 +515,8 @@ sub do_request
 
    $self->prepare_request( $request );
 
-   if( !defined $host ) {
-      $host = delete $args{host} or croak "Expected 'host'";
-   }
-
-   if( !defined $port ) {
-      $port = delete $args{port} || ( $ssl ? HTTPS_PORT : HTTP_PORT );
-   }
+   defined $host or croak "Expected 'host'";
+   defined $port or $port = ( $ssl ? HTTPS_PORT : HTTP_PORT );
 
    $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
 
