@@ -575,6 +575,8 @@ sub prepare_request
    my ( $request ) = @_;
 
    $request->init_header( 'User-Agent' => $self->{user_agent} ) if length $self->{user_agent};
+   $request->init_header( "Connection" => "keep-alive" );
+
    $self->{cookie_jar}->add_cookie_header( $request ) if $self->{cookie_jar};
 }
 

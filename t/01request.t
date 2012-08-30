@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 85;
+use Test::More tests => 87;
 use Test::Identity;
 use IO::Async::Test;
 use IO::Async::Loop;
@@ -75,7 +75,7 @@ sub do_test_req
    is( $req_firstline, $args{expect_req_firstline}, "First line for $name" );
 
    $request_stream =~ s/^(.*)$CRLF$CRLF//s;
-   my %req_headers = map { m/^(.*?):\s+(.*)$/g } split( m/$CRLF/, $1 );
+   my %req_headers = map { m/^([^:]+):\s+(.*)$/g } split( m/$CRLF/, $1 );
 
    my $req_content;
    if( defined( my $len = $req_headers{'Content-Length'} ) ) {
@@ -85,7 +85,11 @@ sub do_test_req
       substr( $request_stream, 0, $len ) = "";
    }
 
-   is_deeply( \%req_headers, $args{expect_req_headers}, "Request headers for $name" );
+   my $expect_req_headers = $args{expect_req_headers};
+
+   foreach my $header ( keys %$expect_req_headers ) {
+      is( $req_headers{$header}, $expect_req_headers->{$header}, "Expected value for $header" );
+   }
 
    if( defined $args{expect_req_content} ) {
       is( $req_content, $args{expect_req_content}, "Request content for $name" );
@@ -140,14 +144,14 @@ do_test_req( "simple HEAD",
    response => "HTTP/1.1 200 OK$CRLF" . 
                "Content-Length: 13$CRLF" . 
                "Content-Type: text/plain$CRLF" .
-               "Connection: Keep-Alive$CRLF" .
+               "Connection: keep-alive$CRLF" .
                $CRLF,
 
    expect_res_code    => 200,
    expect_res_headers => {
       'Content-Length' => 13,
       'Content-Type'   => "text/plain",
-      'Connection'     => "Keep-Alive",
+      'Connection'     => "keep-alive",
    },
    expect_res_content => "",
 );
