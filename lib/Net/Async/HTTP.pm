@@ -451,6 +451,7 @@ sub do_request
          }
 
          $args{on_redirect}->( $response, $location ) if $args{on_redirect};
+         $args{timer} = $timer;
 
          $self->do_request(
             %args,
