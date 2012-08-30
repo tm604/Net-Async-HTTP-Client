@@ -219,6 +219,14 @@ sub request
       my $connection_close = lc( $header->header( "Connection" ) || ( $self->{can_pipeline} ? "keep-alive" : "close" ) )
                               eq "close";
 
+      if( $connection_close ) {
+         $self->{max_in_flight} = 1;
+      }
+      elsif( defined( my $keep_alive = lc( $header->header("Keep-Alive") || "" ) ) ) {
+         my ( $max ) = ( $keep_alive =~ m/max=(\d+)/ );
+         $self->{max_in_flight} = $max if $max && $max < $self->{max_in_flight};
+      }
+
       # RFC 2616 says "HEAD" does not have a body, nor do any 1xx codes, nor
       # 204 (No Content) nor 304 (Not Modified)
       if( $method eq "HEAD" or $code =~ m/^1..$/ or $code eq "204" or $code eq "304" ) {
