@@ -212,7 +212,10 @@ sub request
       my $on_body_chunk = $on_header->( $header );
 
       my $code = $header->code;
-      my $connection_close = lc( $header->header( "Connection" ) || "close" ) eq "close";
+
+      # can_pipeline is set for HTTP/1.1 or above; presume it can keep-alive if set
+      my $connection_close = lc( $header->header( "Connection" ) || ( $self->{can_pipeline} ? "keep-alive" : "close" ) )
+                              eq "close";
 
       # RFC 2616 says "HEAD" does not have a body, nor do any 1xx codes, nor
       # 204 (No Content) nor 304 (Not Modified)
