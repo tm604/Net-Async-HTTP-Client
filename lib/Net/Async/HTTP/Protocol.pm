@@ -298,6 +298,7 @@ sub request
          if( $content_length == 0 ) {
             $self->debug_printf( "BODY done" );
             $on_body_chunk->();
+            $self->_request_done;
             return undef; # Finished
          }
 
