@@ -44,7 +44,7 @@ sub _init
 {
    my $self = shift;
 
-   $self->{outstanding_requests} = 0;
+   $self->{requests_in_flight} = 0;
 }
 
 sub configure
@@ -95,13 +95,13 @@ sub ready
 sub is_idle
 {
    my $self = shift;
-   return $self->{outstanding_requests} == 0;
+   return $self->{requests_in_flight} == 0;
 }
 
 sub _request_done
 {
    my $self = shift;
-   $self->{outstanding_requests}--;
+   $self->{requests_in_flight}--;
    $self->ready;
 }
 
@@ -377,7 +377,7 @@ sub request
 
    $self->write( $request_body ) if $request_body;
 
-   $self->{outstanding_requests}++;
+   $self->{requests_in_flight}++;
 
    push @{ $self->{responder_queue} }, [ $on_read, $on_error ];
 }

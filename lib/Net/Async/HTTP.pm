@@ -70,9 +70,8 @@ C<Net::Async::HTTP> - use HTTP with C<IO::Async>
 This object class implements an asynchronous HTTP user agent. It sends
 requests to servers, and invokes continuation callbacks when responses are
 received. The object supports multiple concurrent connections to servers, and
-allows multiple outstanding requests in pipeline to any one connection.
-Normally, only one such object will be needed per program to support any
-number of requests.
+allows multiple requests in the pipeline to any one connection. Normally, only
+one such object will be needed per program to support any number of requests.
 
 This module optionally supports SSL connections, if L<IO::Async::SSL> is
 installed. If so, SSL can be requested either by passing a URI with the
