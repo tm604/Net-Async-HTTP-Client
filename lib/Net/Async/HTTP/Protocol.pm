@@ -52,9 +52,11 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( pipeline )) {
+   foreach (qw( pipeline max_in_flight )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
+
+   croak "max_in_flight parameter required, may be zero" unless defined $self->{max_in_flight};
 
    $self->SUPER::configure( %params );
 }
@@ -62,7 +64,9 @@ sub configure
 sub should_pipeline
 {
    my $self = shift;
-   return $self->{pipeline} && $self->{can_pipeline};
+   return $self->{pipeline} &&
+          $self->{can_pipeline} &&
+          ( !$self->{max_in_flight} || $self->{requests_in_flight} < $self->{max_in_flight} );
 }
 
 sub connect
@@ -83,10 +87,9 @@ sub ready
 
    if( $self->should_pipeline ) {
       $self->debug_printf( "READY pipelined" );
-      $self->{on_ready_queue} = [];
-      $_->[ON_READY]->( $self ) for @$queue;
+      ( shift @$queue )->[ON_READY]->( $self ) while @$queue && $self->should_pipeline;
    }
-   elsif( @$queue ) {
+   elsif( @$queue and $self->is_idle ) {
       $self->debug_printf( "READY non-pipelined" );
       ( shift @$queue )->[ON_READY]->( $self );
    }
@@ -110,11 +113,10 @@ sub run_when_ready
    my $self = shift;
    my ( $on_ready, $on_error ) = @_;
 
-   if( $self->transport and ( $self->should_pipeline or $self->is_idle ) ) {
-      $on_ready->( $self );
-   }
-   else {
-      push @{ $self->{on_ready_queue} }, [ $on_ready, $on_error ];
+   push @{ $self->{on_ready_queue} }, [ $on_ready, $on_error ];
+
+   if( $self->transport ) {
+      $self->ready;
    }
 }
 

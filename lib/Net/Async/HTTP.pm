@@ -13,6 +13,7 @@ our $VERSION = '0.17';
 
 our $DEFAULT_UA = "Perl + " . __PACKAGE__ . "/$VERSION";
 our $DEFAULT_MAXREDIR = 3;
+our $DEFAULT_MAX_IN_FLIGHT = 0;
 
 use Carp;
 
@@ -102,6 +103,14 @@ be constructed that declares C<Net::Async::HTTP> and the version number.
 Optional. How many levels of redirection to follow. If not supplied, will
 default to 3. Give 0 to disable redirection entirely.
 
+=item max_in_flight => INT
+
+Optional. The maximum number of in-flight requests to allow per host when
+pipelining is enabled and supported on that host. If not supplied then no
+limit will be applied. If more requests are made over this limit they will be
+queued internally by the object and not sent to the server until responses are
+received.
+
 =item timeout => NUM
 
 Optional. How long in seconds to wait before giving up on a request. If not
@@ -143,8 +152,10 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( user_agent max_redirects timeout proxy_host proxy_port cookie_jar pipeline
-                local_host local_port local_addrs local_addr )) {
+   foreach (qw( user_agent max_redirects max_in_flight
+      timeout proxy_host proxy_port cookie_jar pipeline local_host local_port
+      local_addrs local_addr ))
+   {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -152,6 +163,7 @@ sub configure
 
    defined $self->{user_agent}    or $self->{user_agent}    = $DEFAULT_UA;
    defined $self->{max_redirects} or $self->{max_redirects} = $DEFAULT_MAXREDIR;
+   defined $self->{max_in_flight} or $self->{max_in_flight} = $DEFAULT_MAX_IN_FLIGHT;
    defined $self->{pipeline}      or $self->{pipeline}      = 1;
 }
 
@@ -182,6 +194,7 @@ sub get_connection
 
    my $conn = Net::Async::HTTP::Protocol->new(
       notifier_name => $key,
+      max_in_flight => $self->{max_in_flight},
       pipeline => $self->{pipeline},
       on_closed => sub {
          delete $connections->{$key};
