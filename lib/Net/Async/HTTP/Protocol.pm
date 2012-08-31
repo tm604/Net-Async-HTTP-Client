@@ -72,8 +72,12 @@ sub should_pipeline
 sub connect
 {
    my $self = shift;
+   my %args = @_;
+
+   $self->debug_printf( "CONNECT $args{host}:$args{service}" );
+
    $self->SUPER::connect(
-      @_,
+      %args,
 
       on_connected => $self->can('ready'),
    );
@@ -93,6 +97,10 @@ sub ready
       $self->debug_printf( "READY non-pipelined" );
       ( shift @$queue )->[ON_READY]->( $self );
    }
+   else {
+      $self->debug_printf( "READY cannot-run queue=%d idle=%s",
+         scalar @$queue, $self->is_idle ? "Y" : "N");
+   }
 }
 
 sub is_idle
@@ -105,6 +113,7 @@ sub _request_done
 {
    my $self = shift;
    $self->{requests_in_flight}--;
+   $self->debug_printf( "DONE remaining in-flight=$self->{requests_in_flight}" );
    $self->ready;
 }
 
@@ -116,6 +125,7 @@ sub run_when_ready
    push @{ $self->{on_ready_queue} }, [ $on_ready, $on_error ];
 
    if( $self->transport ) {
+      # ready might be better renamed to ``try_ready'' or something.
       $self->ready;
    }
 }
@@ -166,9 +176,11 @@ sub request
 
    my $on_header = $args{on_header} or croak "Expected 'on_header' as a CODE ref";
    my $on_error  = $args{on_error}  or croak "Expected 'on_error' as a CODE ref";
-   
+
    my $req = $args{request};
    ref $req and $req->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
+
+   $self->debug_printf( "REQUEST %s", $req->uri );
 
    my $request_body = $args{request_body};
 
