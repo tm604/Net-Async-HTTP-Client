@@ -197,9 +197,13 @@ sub get_connection
       max_in_flight => $self->{max_in_flight},
       pipeline => $self->{pipeline},
       on_closed => sub {
+         my $conn = shift;
+
+         $conn->remove_from_parent;
          delete $connections->{$key};
       },
    );
+
    $self->add_child( $conn );
 
    $connections->{$key} = $conn;
