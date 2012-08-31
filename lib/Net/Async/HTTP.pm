@@ -13,7 +13,7 @@ our $VERSION = '0.17';
 
 our $DEFAULT_UA = "Perl + " . __PACKAGE__ . "/$VERSION";
 our $DEFAULT_MAXREDIR = 3;
-our $DEFAULT_MAX_IN_FLIGHT = 0;
+our $DEFAULT_MAX_IN_FLIGHT = 4;
 
 use Carp;
 
@@ -106,10 +106,10 @@ default to 3. Give 0 to disable redirection entirely.
 =item max_in_flight => INT
 
 Optional. The maximum number of in-flight requests to allow per host when
-pipelining is enabled and supported on that host. If not supplied then no
-limit will be applied. If more requests are made over this limit they will be
-queued internally by the object and not sent to the server until responses are
-received.
+pipelining is enabled and supported on that host. If more requests are made
+over this limit they will be queued internally by the object and not sent to
+the server until responses are received. If not supplied, will default to 4.
+Give 0 to disable the limit entirely.
 
 =item timeout => NUM
 
