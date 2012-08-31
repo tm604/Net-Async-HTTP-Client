@@ -56,9 +56,44 @@ sub configure
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
+   if( my $on_closed = $params{on_closed} ) {
+      $params{on_closed} = sub {
+         my $self = shift;
+
+         $self->debug_printf( "CLOSED" );
+         $self->error_on_ready( "Connection closed" );
+
+         $on_closed->( $self );
+      };
+   }
+
    croak "max_in_flight parameter required, may be zero" unless defined $self->{max_in_flight};
 
    $self->SUPER::configure( %params );
+}
+
+# TODO: IO::Async::Protocol::Stream ought to do this
+sub setup_transport
+{
+   my $self = shift;
+   my ( $transport ) = @_;
+   $self->SUPER::setup_transport( $transport );
+
+   $transport->configure(
+      on_write_eof => $self->_replace_weakself( "on_write_eof" ),
+   );
+}
+
+sub teardown_transport
+{
+   my $self = shift;
+   my ( $transport ) = @_;
+
+   $transport->configure(
+      on_write_eof => undef,
+   );
+
+   $self->SUPER::teardown_transport( $transport );
 }
 
 sub should_pipeline
@@ -156,6 +191,21 @@ sub on_read
    croak "Spurious on_read of connection while idle\n";
 }
 
+sub on_write_eof
+{
+   my $self = shift;
+   $self->error_all( "Connection closed" );
+}
+
+sub error_on_ready
+{
+   my $self = shift;
+
+   while( my $head = shift @{ $self->{on_ready_queue} } ) {
+      $head->[ON_ERROR]->( @_ );
+   }
+}
+
 sub error_all
 {
    my $self = shift;
@@ -164,9 +214,7 @@ sub error_all
       $head->[ON_ERROR]->( @_ );
    }
 
-   while( my $head = shift @{ $self->{on_ready_queue} } ) {
-      $head->[ON_ERROR]->( @_ );
-   }
+   $self->error_on_ready( @_ );
 }
 
 sub request
