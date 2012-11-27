@@ -280,7 +280,8 @@ do_test_req( "GET chunks",
                "Transfer-Encoding: chunked$CRLF" .
                $CRLF .
                "7$CRLF" . "Hello, " . $CRLF .
-               "6$CRLF" . "world!" . $CRLF .
+               # Handle trailing whitespace on chunk size
+               "6 $CRLF" . "world!" . $CRLF .
                "0$CRLF" .
                "$CRLF",
 

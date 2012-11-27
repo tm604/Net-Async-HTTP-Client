@@ -308,7 +308,7 @@ sub request
          return sub {
             my ( $self, $buffref, $closed ) = @_;
 
-            if( !defined $chunk_length and $$buffref =~ s/^(.*?)$CRLF// ) {
+            if( !defined $chunk_length and $$buffref =~ s/^([A-Fa-f0-9]+).*?$CRLF// ) {
                # Chunk header
                $chunk_length = hex( $1 );
                return 1 if $chunk_length;
