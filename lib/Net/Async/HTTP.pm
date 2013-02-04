@@ -76,7 +76,7 @@ one such object will be needed per program to support any number of requests.
 
 This module optionally supports SSL connections, if L<IO::Async::SSL> is
 installed. If so, SSL can be requested either by passing a URI with the
-C<https> scheme, or by passing the a true value as the C<SSL> parameter.
+C<https> scheme, or by passing a true value as the C<SSL> parameter.
 
 =cut
 
