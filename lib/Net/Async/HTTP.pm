@@ -188,8 +188,10 @@ sub get_connection
    my $key = "$host:$port";
 
    if( my $conn = $connections->{$key} ) {
-      $conn->run_when_ready( $on_ready, $on_error );
-      return;
+      my $f = $conn->new_ready_future;
+      $f->on_done( $on_ready );
+      $f->on_fail( $on_error );
+      return $f;
    }
 
    my $conn = Net::Async::HTTP::Protocol->new(
@@ -239,7 +241,10 @@ sub get_connection
       ( map { defined $self->{$_} ? ( $_ => $self->{$_} ) : () } qw( local_host local_port local_addrs local_addr ) ),
    );
 
-   $conn->run_when_ready( $on_ready, $on_error );
+   my $f = $conn->new_ready_future;
+   $f->on_done( $on_ready );
+   $f->on_fail( $on_error );
+   return $f;
 }
 
 =head2 $http->do_request( %args )

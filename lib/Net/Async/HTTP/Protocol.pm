@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2008-2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2008-2013 -- leonerd@leonerd.org.uk
 
 package Net::Async::HTTP::Protocol;
 
@@ -14,14 +14,13 @@ use Carp;
 
 use base qw( IO::Async::Protocol::Stream );
 
+use Future;
 use HTTP::Response;
 
 my $CRLF = "\x0d\x0a"; # More portable than \r\n
 
 # Indices into responder/ready queue elements
-# Honestly, these would be much neater with Futures...
 use constant ON_READ  => 0;
-use constant ON_READY => 0;
 use constant ON_ERROR => 1;
 
 # Detect whether HTTP::Message properly trims whitespace in header values. If
@@ -126,11 +125,11 @@ sub ready
 
    if( $self->should_pipeline ) {
       $self->debug_printf( "READY pipelined" );
-      ( shift @$queue )->[ON_READY]->( $self ) while @$queue && $self->should_pipeline;
+      ( shift @$queue )->done( $self ) while @$queue && $self->should_pipeline;
    }
    elsif( @$queue and $self->is_idle ) {
       $self->debug_printf( "READY non-pipelined" );
-      ( shift @$queue )->[ON_READY]->( $self );
+      ( shift @$queue )->done( $self );
    }
    else {
       $self->debug_printf( "READY cannot-run queue=%d idle=%s",
@@ -152,17 +151,18 @@ sub _request_done
    $self->ready;
 }
 
-sub run_when_ready
+sub new_ready_future
 {
    my $self = shift;
-   my ( $on_ready, $on_error ) = @_;
 
-   push @{ $self->{on_ready_queue} }, [ $on_ready, $on_error ];
+   push @{ $self->{on_ready_queue} }, my $f = Future->new;
 
    if( $self->transport ) {
       # ready might be better renamed to ``try_ready'' or something.
       $self->ready;
    }
+
+   return $f;
 }
 
 sub on_read
@@ -202,7 +202,7 @@ sub error_on_ready
    my $self = shift;
 
    while( my $head = shift @{ $self->{on_ready_queue} } ) {
-      $head->[ON_ERROR]->( @_ );
+      $head->fail( @_ );
    }
 }
 
