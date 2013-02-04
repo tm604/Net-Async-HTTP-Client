@@ -500,11 +500,8 @@ sub do_request
 
       $host = $uri->host;
       $port = $uri->port;
-      my $path = $uri->path_query;
 
       $ssl = ( $uri->scheme eq "https" );
-
-      $path = "/" if $path eq "";
 
       if( $method eq "POST" ) {
          defined $args{content} or croak "Expected 'content' with POST method";
@@ -514,10 +511,10 @@ sub do_request
             carp "No 'content_type' was given with 'content'";
 
          # This will automatically encode a form for us
-         $request = HTTP::Request::Common::POST( $path, Content => $args{content}, Content_Type => $args{content_type} );
+         $request = HTTP::Request::Common::POST( $uri, Content => $args{content}, Content_Type => $args{content_type} );
       }
       else {
-         $request = HTTP::Request->new( $method, $path );
+         $request = HTTP::Request->new( $method, $uri );
       }
 
       $request->protocol( "HTTP/1.1" );

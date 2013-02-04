@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 12;
+use Test::More tests => 13;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -99,7 +99,8 @@ $loop->add( $http );
    isa_ok( $response->previous, "HTTP::Response", '$response->previous' );
 
    my $previous = $response->previous;
-   is( $previous->request->uri, "/doc", 'Previous request URI' );
+   isa_ok( $previous->request->uri, "URI", 'Previous request URI is a URI' );
+   is( $previous->request->uri, "http://host0/doc", 'Previous request URI string' );
 }
 
 {
