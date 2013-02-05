@@ -81,6 +81,9 @@ sub setup_transport
    $transport->configure(
       on_write_eof => $self->_replace_weakself( "on_write_eof" ),
    );
+
+   $self->debug_printf( "CONNECTED" );
+   $self->ready;
 }
 
 sub teardown_transport
@@ -110,11 +113,7 @@ sub connect
 
    $self->debug_printf( "CONNECT $args{host}:$args{service}" );
 
-   $self->SUPER::connect(
-      %args,
-
-      on_connected => $self->can('ready'),
-   );
+   $self->SUPER::connect( %args );
 }
 
 sub ready

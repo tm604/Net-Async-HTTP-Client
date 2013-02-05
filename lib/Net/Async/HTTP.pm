@@ -176,9 +176,6 @@ sub get_connection
    my $self = shift;
    my %args = @_;
 
-   my $on_ready = delete $args{on_ready} or croak "Expected 'on_ready' as a CODE ref";
-   my $on_error = delete $args{on_error} or croak "Expected 'on_error' as a CODE ref";
-
    my $loop = $self->get_loop or croak "Cannot ->get_connection without a Loop";
 
    my $host = delete $args{host};
@@ -188,10 +185,7 @@ sub get_connection
    my $key = "$host:$port";
 
    if( my $conn = $connections->{$key} ) {
-      my $f = $conn->new_ready_future;
-      $f->on_done( $on_ready );
-      $f->on_fail( $on_error );
-      return $f;
+      return $conn->new_ready_future;
    }
 
    my $conn = Net::Async::HTTP::Protocol->new(
@@ -210,6 +204,8 @@ sub get_connection
 
    $connections->{$key} = $conn;
 
+   my $f = $conn->new_ready_future;
+
    if( $args{SSL} ) {
       require IO::Async::SSL;
       IO::Async::SSL->VERSION( 0.04 );
@@ -218,7 +214,7 @@ sub get_connection
 
       $args{on_ssl_error} = sub {
          delete $connections->{$key};
-         $on_error->( "$host:$port SSL error [$_[0]]" );
+         $f->fail( "$host:$port SSL error [$_[0]]" );
       };
    }
 
@@ -228,12 +224,12 @@ sub get_connection
 
       on_resolve_error => sub {
          delete $connections->{$key};
-         $on_error->( "$host:$port not resolvable [$_[0]]" );
+         $f->fail( "$host:$port not resolvable [$_[0]]" );
       },
 
       on_connect_error => sub {
          delete $connections->{$key};
-         $on_error->( "$host:$port not contactable [$_[-1]]" );
+         $f->fail( "$host:$port not contactable [$_[-1]]" );
       },
 
       %args,
@@ -241,9 +237,6 @@ sub get_connection
       ( map { defined $self->{$_} ? ( $_ => $self->{$_} ) : () } qw( local_host local_port local_addrs local_addr ) ),
    );
 
-   my $f = $conn->new_ready_future;
-   $f->on_done( $on_ready );
-   $f->on_fail( $on_error );
    return $f;
 }
 
@@ -547,31 +540,30 @@ sub do_request
 
    $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
 
-   $self->get_connection(
+   my $f = $self->get_connection(
       host => $args{proxy_host} || $self->{proxy_host} || $host,
       port => $args{proxy_port} || $self->{proxy_port} || $port,
       SSL  => $ssl,
-
-      on_error => $on_error,
-
-      on_ready => sub {
-         my ( $conn ) = @_;
-         return if $timer and $timer->expired;
-
-         $conn->request(
-            request => $request,
-            request_body => $request_body,
-            previous_response => $args{previous_response},
-            on_header => $on_header_redir,
-            on_error  => $on_error,
-         );
-
-         $timer->set_on_expire( sub {
-            $conn->error_all( "Timed out" );
-            $conn->close;
-         } ) if $timer;
-      },
    );
+
+   $f->on_fail( $on_error );
+   $f->on_done( sub {
+      my ( $conn ) = @_;
+      return if $timer and $timer->expired;
+
+      $conn->request(
+         request => $request,
+         request_body => $request_body,
+         previous_response => $args{previous_response},
+         on_header => $on_header_redir,
+         on_error  => $on_error,
+      );
+
+      $timer->set_on_expire( sub {
+         $conn->error_all( "Timed out" );
+         $conn->close;
+      } ) if $timer;
+   } );
 }
 
 =head1 SUBCLASS METHODS
