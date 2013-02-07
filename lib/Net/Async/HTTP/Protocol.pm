@@ -14,7 +14,6 @@ use Carp;
 
 use base qw( IO::Async::Protocol::Stream );
 
-use Future;
 use HTTP::Response;
 
 my $CRLF = "\x0d\x0a"; # More portable than \r\n
@@ -154,7 +153,7 @@ sub new_ready_future
 {
    my $self = shift;
 
-   push @{ $self->{on_ready_queue} }, my $f = Future->new;
+   push @{ $self->{on_ready_queue} }, my $f = $self->loop->new_future;
 
    if( $self->transport ) {
       # ready might be better renamed to ``try_ready'' or something.
