@@ -221,7 +221,6 @@ sub request
    my %args = @_;
 
    my $on_header = $args{on_header} or croak "Expected 'on_header' as a CODE ref";
-   my $on_error  = $args{on_error}  or croak "Expected 'on_error' as a CODE ref";
 
    my $req = $args{request};
    ref $req and $req->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
@@ -237,7 +236,6 @@ sub request
    }
 
    my $f = $self->loop->new_future;
-   $f->on_fail( $on_error );
 
    my $on_read = sub {
       my ( $self, $buffref, $closed ) = @_;
@@ -450,7 +448,7 @@ sub request
 
    $self->{requests_in_flight}++;
 
-   push @{ $self->{responder_queue} }, [ $on_read, $on_error ];
+   push @{ $self->{responder_queue} }, [ $on_read, $f->fail_cb ];
 
    return $f;
 }

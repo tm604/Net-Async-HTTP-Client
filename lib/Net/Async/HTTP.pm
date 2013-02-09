@@ -540,30 +540,28 @@ sub do_request
 
    $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
 
-   my $f = $self->get_connection(
+   $self->get_connection(
       host => $args{proxy_host} || $self->{proxy_host} || $host,
       port => $args{proxy_port} || $self->{proxy_port} || $port,
       SSL  => $ssl,
-   );
+   )->and_then( sub {
+      my ( $f ) = @_;
 
-   $f->on_fail( $on_error );
-   $f->on_done( sub {
-      my ( $conn ) = @_;
-      return if $timer and $timer->expired;
+      my ( $conn ) = $f->get;
+      return $f if $timer and $timer->expired;
+
+      $timer->set_on_expire( sub {
+         $conn->error_all( "Timed out" );
+         $conn->close;
+      } ) if $timer;
 
       $conn->request(
          request => $request,
          request_body => $request_body,
          previous_response => $args{previous_response},
          on_header => $on_header_redir,
-         on_error  => $on_error,
       );
-
-      $timer->set_on_expire( sub {
-         $conn->error_all( "Timed out" );
-         $conn->close;
-      } ) if $timer;
-   } );
+   } )->on_fail( $on_error );
 }
 
 =head1 SUBCLASS METHODS
