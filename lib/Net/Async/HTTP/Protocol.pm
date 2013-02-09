@@ -236,13 +236,16 @@ sub request
       $req->init_header( "Content-Length", length $req->content );
    }
 
+   my $f = $self->loop->new_future;
+   $f->on_fail( $on_error );
+
    my $on_read = sub {
       my ( $self, $buffref, $closed ) = @_;
 
       unless( $$buffref =~ s/^(.*?$CRLF$CRLF)//s ) {
          if( $closed ) {
             $self->debug_printf( "ERROR closed" );
-            $on_error->( "Connection closed while awaiting header" );
+            $f->fail( "Connection closed while awaiting header" );
          }
          return 0;
       }
@@ -290,7 +293,7 @@ sub request
       if( $method eq "HEAD" or $code =~ m/^1..$/ or $code eq "204" or $code eq "304" ) {
          $self->debug_printf( "BODY done" );
          $self->close if $connection_close;
-         $on_body_chunk->();
+         $f->done( $on_body_chunk->() );
          $self->_request_done;
          return undef; # Finished
       }
@@ -319,7 +322,7 @@ sub request
 
                   if( $closed ) {
                      $self->debug_printf( "ERROR closed" );
-                     $on_error->( "Connection closed while awaiting chunk trailer" );
+                     $f->fail( "Connection closed while awaiting chunk trailer" );
                   }
 
                   $$buffref =~ s/^(.*)$CRLF// or return 0;
@@ -330,7 +333,7 @@ sub request
                   # TODO: Actually use the trailer
 
                   $self->debug_printf( "BODY done" );
-                  $on_body_chunk->();
+                  $f->done( $on_body_chunk->() );
                   $self->_request_done;
                   return undef; # Finished
                }
@@ -344,7 +347,7 @@ sub request
 
                unless( $$buffref =~ s/^$CRLF// ) {
                   $self->debug_printf( "ERROR chunk without CRLF" );
-                  $on_error->( "Chunk of size $chunk_length wasn't followed by CRLF" );
+                  $f->fail( "Chunk of size $chunk_length wasn't followed by CRLF" );
                   $self->close;
                }
 
@@ -355,7 +358,7 @@ sub request
 
             if( $closed ) {
                $self->debug_printf( "ERROR closed" );
-               $on_error->( "Connection closed while awaiting chunk" );
+               $f->fail( "Connection closed while awaiting chunk" );
             }
             return 0;
          };
@@ -365,7 +368,7 @@ sub request
 
          if( $content_length == 0 ) {
             $self->debug_printf( "BODY done" );
-            $on_body_chunk->();
+            $f->done( $on_body_chunk->() );
             $self->_request_done;
             return undef; # Finished
          }
@@ -383,14 +386,14 @@ sub request
             if( $content_length == 0 ) {
                $self->debug_printf( "BODY done" );
                $self->close if $connection_close;
-               $on_body_chunk->();
+               $f->done( $on_body_chunk->() );
                $self->_request_done;
                return undef;
             }
 
             if( $closed ) {
                $self->debug_printf( "ERROR closed" );
-               $on_error->( "Connection closed while awaiting body" );
+               $f->fail( "Connection closed while awaiting body" );
             }
             return 0;
          };
@@ -412,7 +415,7 @@ sub request
             $self->close;
 
             $self->debug_printf( "BODY done" );
-            $on_body_chunk->();
+            $f->done( $on_body_chunk->() );
             # $self already closed
             $self->_request_done;
             return undef;
@@ -448,6 +451,8 @@ sub request
    $self->{requests_in_flight}++;
 
    push @{ $self->{responder_queue} }, [ $on_read, $on_error ];
+
+   return $f;
 }
 
 =head1 AUTHOR
