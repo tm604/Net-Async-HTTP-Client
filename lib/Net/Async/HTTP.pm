@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2008-2012 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2008-2013 -- leonerd@leonerd.org.uk
 
 package Net::Async::HTTP;
 
@@ -434,9 +434,13 @@ sub do_request
 
          return $on_header->( $response ) if $on_header;
          return sub {
-            return $on_response->( $response ) unless @_;
-
-            $response->add_content( @_ );
+            if( @_ ) {
+               $response->add_content( @_ );
+            }
+            else {
+               $on_response->( $response );
+               return $response;
+            }
          };
       }
 
