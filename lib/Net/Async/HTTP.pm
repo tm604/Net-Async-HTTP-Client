@@ -548,6 +548,7 @@ sub do_request
       host => $args{proxy_host} || $self->{proxy_host} || $host,
       port => $args{proxy_port} || $self->{proxy_port} || $port,
       SSL  => $ssl,
+      ( map { m/^SSL_/ ? ( $_ => $args{$_} ) : () } keys %args ),
    )->and_then( sub {
       my ( $f ) = @_;
 
