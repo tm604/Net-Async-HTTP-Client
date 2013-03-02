@@ -77,6 +77,8 @@ my $response;
 $http->do_request(
    uri => $local_uri,
 
+   SSL_verify_mode => 0,
+
    on_response => sub {
       $response = $_[0];
    },

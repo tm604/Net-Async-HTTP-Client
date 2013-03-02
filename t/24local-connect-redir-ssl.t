@@ -84,6 +84,8 @@ my $response;
 $http->do_request(
    uri => URI->new( "https://127.0.0.1:$port/redir" ),
 
+   SSL_verify_mode => 0,
+
    on_response => sub {
       $response = $_[0];
    },
