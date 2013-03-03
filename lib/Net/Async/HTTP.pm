@@ -383,10 +383,8 @@ sub _do_request
    my $self = shift;
    my %args = @_;
 
-   my ( $on_response, $on_header );
-   $on_response  = $args{on_response} or
-      $on_header = $args{on_header}   or croak "Expected 'on_response' or 'on_header' as CODE ref";
-   my $on_error     = $args{on_error} or croak "Expected 'on_error' as a CODE ref";
+   my $on_header    = $args{on_header} or croak "Expected 'on_header' as a CODE ref";
+   my $on_error     = $args{on_error}  or croak "Expected 'on_error' as a CODE ref";
    my $request_body = $args{request_body};
 
    my $max_redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
@@ -415,14 +413,6 @@ sub _do_request
       $self->add_child( $timer );
       $timer->start;
 
-      my $inner_on_response = $on_response;
-      $on_response = $self->_capture_weakself( sub {
-         my $self = shift;
-         $timer->stop;
-         $self->remove_child( $timer );
-         goto $inner_on_response;
-      } );
-
       my $inner_on_error = $on_error;
       $on_error = $self->_capture_weakself( sub {
          my $self = shift;
@@ -445,16 +435,7 @@ sub _do_request
       if( !$response->is_redirect or $max_redirects == 0 ) {
          $self->process_response( $response );
 
-         return $on_header->( $response ) if $on_header;
-         return sub {
-            if( @_ ) {
-               $response->add_content( @_ );
-            }
-            else {
-               $on_response->( $response );
-               return $response;
-            }
-         };
+         return $on_header->( $response );
       }
 
       # Ignore body but handle redirect at the end of it
@@ -570,6 +551,27 @@ sub do_request
       }
 
       $args{request} = $request;
+   }
+
+   if( $args{on_header} ) {
+      # ok
+   }
+   elsif( my $on_response = delete $args{on_response} ) {
+      $args{on_header} = sub {
+         my ( $response ) = @_;
+         return sub {
+            if( @_ ) {
+               $response->add_content( @_ );
+            }
+            else {
+               $on_response->( $response );
+               return $response;
+            }
+         };
+      }
+   }
+   else {
+      croak "Expected 'on_response' or 'on_header' as CODE ref";
    }
 
    $self->_do_request( %args );
