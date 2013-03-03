@@ -432,6 +432,8 @@ sub _do_request
    my $port = $args{port};
    my $ssl  = $args{SSL};
 
+   my $timer = $args{timer};
+
    my $uri = $args{request}->uri;
    if( defined $uri->scheme and $uri->scheme =~ m/^http(s?)$/ ) {
       $host = $uri->host if !defined $host;
@@ -446,25 +448,6 @@ sub _do_request
    my $on_error  = $args{on_error}  or croak "Expected 'on_error' as a CODE ref";
 
    my $max_redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
-
-   my $timeout = defined $args{timeout} ? $args{timeout} : $self->{timeout};
-
-   my $timer = $args{timer};
-   if( !$timer and defined $timeout ) {
-      $timer = Net::Async::HTTP::Timer->new( delay => $timeout );
-      $self->add_child( $timer );
-      $timer->start;
-
-      my $inner_on_error = $on_error;
-      $on_error = $self->_capture_weakself( sub {
-         my $self = shift;
-         $timer->stop;
-         $self->remove_child( $timer );
-         goto $inner_on_error;
-      } );
-
-      $args{timer} = $timer;
-   }
 
    my $on_header_redir = $self->_capture_weakself( sub {
       my $self = shift;
@@ -553,6 +536,24 @@ sub do_request
    }
    else {
       croak "Expected 'on_response' or 'on_header' as CODE ref";
+   }
+
+   my $timeout = defined $args{timeout} ? $args{timeout} : $self->{timeout};
+
+   if( defined $timeout ) {
+      my $timer = Net::Async::HTTP::Timer->new( delay => $timeout );
+      $self->add_child( $timer );
+      $timer->start;
+
+      my $on_error = $args{on_error};
+      $args{on_error} = $self->_capture_weakself( sub {
+         my $self = shift;
+         $timer->stop;
+         $self->remove_child( $timer );
+         goto $on_error;
+      } );
+
+      $args{timer} = $timer;
    }
 
    $self->_do_request( %args );
