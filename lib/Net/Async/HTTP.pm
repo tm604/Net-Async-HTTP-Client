@@ -378,26 +378,61 @@ fail with the same error.
 
 =cut
 
-sub _do_request
+sub _do_one_request
 {
    my $self = shift;
    my %args = @_;
 
-   my $on_header    = $args{on_header} or croak "Expected 'on_header' as a CODE ref";
-   my $on_error     = $args{on_error}  or croak "Expected 'on_error' as a CODE ref";
    my $request_body = $args{request_body};
-
-   my $max_redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
-   my $timeout       = defined $args{timeout}       ? $args{timeout}       : $self->{timeout};
 
    my $host = delete $args{host};
    my $port = delete $args{port};
    my $ssl  = delete $args{SSL};
 
+   my $timer = delete $args{timer};
+
    my $request = delete $args{request};
    ref $request and $request->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
 
-   my $uri = $request->uri;
+   $self->prepare_request( $request );
+
+   $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
+
+   $self->get_connection(
+      host => $args{proxy_host} || $self->{proxy_host} || $host,
+      port => $args{proxy_port} || $self->{proxy_port} || $port,
+      SSL  => $ssl,
+      ( map { m/^SSL_/ ? ( $_ => $args{$_} ) : () } keys %args ),
+   )->and_then( sub {
+      my ( $f ) = @_;
+
+      my ( $conn ) = $f->get;
+      return $f if $timer and $timer->expired;
+
+      $timer->set_on_expire( sub {
+         $conn->error_all( "Timed out" );
+         $conn->close;
+      } ) if $timer;
+
+      $conn->request(
+         request => $request,
+         request_body => $request_body,
+         previous_response => $args{previous_response},
+         on_header => $args{on_header},
+      );
+   } )->on_fail( $args{on_error} );
+}
+
+sub _do_request
+{
+   my $self = shift;
+   my %args = @_;
+
+   my $host = $args{host};
+   my $port = $args{port};
+   my $ssl  = $args{SSL};
+
+   my $uri = $args{request}->uri;
    if( defined $uri->scheme and $uri->scheme =~ m/^http(s?)$/ ) {
       $host = $uri->host if !defined $host;
       $port = $uri->port if !defined $port;
@@ -406,6 +441,13 @@ sub _do_request
 
    defined $host or croak "Expected 'host'";
    defined $port or $port = ( $ssl ? HTTPS_PORT : HTTP_PORT );
+
+   my $on_header = delete $args{on_header} or croak "Expected 'on_header' as a CODE ref";
+   my $on_error  = $args{on_error}  or croak "Expected 'on_error' as a CODE ref";
+
+   my $max_redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
+
+   my $timeout = defined $args{timeout} ? $args{timeout} : $self->{timeout};
 
    my $timer = $args{timer};
    if( !$timer and defined $timeout ) {
@@ -420,6 +462,8 @@ sub _do_request
          $self->remove_child( $timer );
          goto $inner_on_error;
       } );
+
+      $args{timer} = $timer;
    }
 
    my $on_header_redir = $self->_capture_weakself( sub {
@@ -463,44 +507,23 @@ sub _do_request
          }
 
          $args{on_redirect}->( $response, $location ) if $args{on_redirect};
-         $args{timer} = $timer;
 
          $self->do_request(
             uri => $loc_uri,
             %args,
+            on_header => $on_header,
             max_redirects => $max_redirects - 1,
             previous_response => $response,
          );
       }
    } );
 
-   $self->prepare_request( $request );
-
-   $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
-
-   $self->get_connection(
-      host => $args{proxy_host} || $self->{proxy_host} || $host,
-      port => $args{proxy_port} || $self->{proxy_port} || $port,
-      SSL  => $ssl,
-      ( map { m/^SSL_/ ? ( $_ => $args{$_} ) : () } keys %args ),
-   )->and_then( sub {
-      my ( $f ) = @_;
-
-      my ( $conn ) = $f->get;
-      return $f if $timer and $timer->expired;
-
-      $timer->set_on_expire( sub {
-         $conn->error_all( "Timed out" );
-         $conn->close;
-      } ) if $timer;
-
-      $conn->request(
-         request => $request,
-         request_body => $request_body,
-         previous_response => $args{previous_response},
-         on_header => $on_header_redir,
-      );
-   } )->on_fail( $on_error );
+   $self->_do_one_request(
+      on_header => $on_header_redir,
+      host => $host,
+      port => $port,
+      %args
+   );
 }
 
 sub do_request
