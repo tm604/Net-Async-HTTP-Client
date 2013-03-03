@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Test::More;
+use Test::Identity;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -42,7 +43,7 @@ $loop->add( $http );
       );
    };
 
-   $http->do_request(
+   my $future = $http->do_request(
       uri => URI->new( "http://host0/doc" ),
 
       timeout => 10,
@@ -51,6 +52,8 @@ $loop->add( $http );
       on_redirect => sub { ( $redir_response, $location ) = @_ },
       on_error    => sub { die "Test died early - $_[0]" },
    );
+
+   ok( defined $future, '$future defined for redirect' );
 
    my $request_stream = "";
    wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
@@ -72,6 +75,8 @@ $loop->add( $http );
    wait_for { defined $location };
 
    is( $location, "http://host0/get_doc?name=doc", 'Redirect happens' );
+
+   ok( !$future->is_ready, '$future is not yet ready after redirect' );
 
    $request_stream = "";
    wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
@@ -101,6 +106,9 @@ $loop->add( $http );
    my $previous = $response->previous;
    isa_ok( $previous->request->uri, "URI", 'Previous request URI is a URI' );
    is( $previous->request->uri, "http://host0/doc", 'Previous request URI string' );
+
+   ok( $future->is_ready, '$future is now ready for final response' );
+   identical( scalar $future->get, $response, '$future->get yields final response' );
 }
 
 {

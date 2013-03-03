@@ -378,6 +378,11 @@ fail with the same error.
 
 =back
 
+=head2 $future = $http->do_request( %args )
+
+This method also returns a L<Future>, which will eventually yield the (final
+non-redirect) C<HTTP::Response>.
+
 =cut
 
 sub _do_one_request

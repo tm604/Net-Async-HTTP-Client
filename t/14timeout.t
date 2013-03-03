@@ -37,7 +37,7 @@ local *Net::Async::HTTP::Protocol::connect = sub {
    my $errcount;
    my $error;
 
-   $http->do_request(
+   my $future = $http->do_request(
       uri => URI->new( "http://my.server/doc" ),
 
       timeout => 1, # Really quick for testing
@@ -53,6 +53,9 @@ local *Net::Async::HTTP::Protocol::connect = sub {
    like( $error, qr/^Timed out/, 'Received timeout error' );
    is( $errcount, 1, 'on_error invoked once' );
 
+   ok( $future->is_ready, '$future is ready after timeout' );
+   like( scalar $future->failure, qr/^Timed out /, '$future->failure after timeout' );
+
    is_refcount( $http, 2, '$http refcount 2 after ->do_request with timeout fails' );
 }
 
@@ -60,7 +63,7 @@ local *Net::Async::HTTP::Protocol::connect = sub {
    my $errcount;
    my $error;
 
-   $http->do_request(
+   my $future = $http->do_request(
       uri => URI->new( "http://my.server/redir" ),
 
       timeout => 1, # Really quick for testing
@@ -84,6 +87,9 @@ local *Net::Async::HTTP::Protocol::connect = sub {
 
    like( $error, qr/^Timed out/, 'Received timeout error from redirect' );
    is( $errcount, 1, 'on_error invoked once from redirect' );
+
+   ok( $future->is_ready, '$future is ready after timeout' );
+   like( scalar $future->failure, qr/^Timed out /, '$future->failure after timeout' );
 }
 
 {
