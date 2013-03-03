@@ -383,16 +383,10 @@ sub _do_one_request
    my $self = shift;
    my %args = @_;
 
-   my $request_body = $args{request_body};
-
-   my $host = delete $args{host};
-   my $port = delete $args{port};
-   my $ssl  = delete $args{SSL};
-
-   my $timer = delete $args{timer};
-
+   my $host    = delete $args{host};
+   my $port    = delete $args{port};
+   my $timer   = delete $args{timer};
    my $request = delete $args{request};
-   ref $request and $request->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
 
    $self->prepare_request( $request );
 
@@ -401,7 +395,7 @@ sub _do_one_request
    return $self->get_connection(
       host => $args{proxy_host} || $self->{proxy_host} || $host,
       port => $args{proxy_port} || $self->{proxy_port} || $port,
-      SSL  => $ssl,
+      SSL  => $args{SSL},
       ( map { m/^SSL_/ ? ( $_ => $args{$_} ) : () } keys %args ),
    )->and_then( sub {
       my ( $f ) = @_;
@@ -416,9 +410,7 @@ sub _do_one_request
 
       return $conn->request(
          request => $request,
-         request_body => $request_body,
-         previous_response => $args{previous_response},
-         on_header => $args{on_header},
+         %args,
       );
    } );
 }
