@@ -508,13 +508,12 @@ sub _do_request
 
          $args{on_redirect}->( $response, $location ) if $args{on_redirect};
 
-         $self->do_request(
-            uri => $loc_uri,
+         $self->_do_request( $self->_make_request_for_uri( $loc_uri,
             %args,
             on_header => $on_header,
             max_redirects => $max_redirects - 1,
             previous_response => $response,
-         );
+         ) );
       }
    } );
 
@@ -532,48 +531,7 @@ sub do_request
    my %args = @_;
 
    if( my $uri = delete $args{uri} ) {
-      ref $uri and $uri->isa( "URI" ) or croak "Expected 'uri' as a URI reference";
-
-      my $method = delete $args{method} || "GET";
-
-      $args{host} = $uri->host;
-      $args{port} = $uri->port;
-      $args{SSL}  = ( $uri->scheme eq "https" );
-
-      my $request;
-
-      if( $method eq "POST" ) {
-         defined $args{content} or croak "Expected 'content' with POST method";
-
-         # Lack of content_type didn't used to be a failure condition:
-         ref $args{content} or defined $args{content_type} or
-         carp "No 'content_type' was given with 'content'";
-
-         # This will automatically encode a form for us
-         $request = HTTP::Request::Common::POST( $uri, Content => $args{content}, Content_Type => $args{content_type} );
-      }
-      else {
-         $request = HTTP::Request->new( $method, $uri );
-      }
-
-      $request->protocol( "HTTP/1.1" );
-      $request->header( Host => $uri->host );
-
-      my ( $user, $pass );
-
-      if( defined $uri->userinfo ) {
-         ( $user, $pass ) = split( m/:/, $uri->userinfo, 2 );
-      }
-      elsif( defined $args{user} and defined $args{pass} ) {
-         $user = $args{user};
-         $pass = $args{pass};
-      }
-
-      if( defined $user and defined $pass ) {
-         $request->authorization_basic( $user, $pass );
-      }
-
-      $args{request} = $request;
+      %args = $self->_make_request_for_uri( $uri, %args );
    }
 
    if( $args{on_header} ) {
@@ -598,6 +556,57 @@ sub do_request
    }
 
    $self->_do_request( %args );
+}
+
+sub _make_request_for_uri
+{
+   my $self = shift;
+   my ( $uri, %args ) = @_;
+
+   ref $uri and $uri->isa( "URI" ) or croak "Expected 'uri' as a URI reference";
+
+   my $method = delete $args{method} || "GET";
+
+   $args{host} = $uri->host;
+   $args{port} = $uri->port;
+   $args{SSL}  = ( $uri->scheme eq "https" );
+
+   my $request;
+
+   if( $method eq "POST" ) {
+      defined $args{content} or croak "Expected 'content' with POST method";
+
+      # Lack of content_type didn't used to be a failure condition:
+      ref $args{content} or defined $args{content_type} or
+      carp "No 'content_type' was given with 'content'";
+
+      # This will automatically encode a form for us
+      $request = HTTP::Request::Common::POST( $uri, Content => $args{content}, Content_Type => $args{content_type} );
+   }
+   else {
+      $request = HTTP::Request->new( $method, $uri );
+   }
+
+   $request->protocol( "HTTP/1.1" );
+   $request->header( Host => $uri->host );
+
+   my ( $user, $pass );
+
+   if( defined $uri->userinfo ) {
+      ( $user, $pass ) = split( m/:/, $uri->userinfo, 2 );
+   }
+   elsif( defined $args{user} and defined $args{pass} ) {
+      $user = $args{user};
+      $pass = $args{pass};
+   }
+
+   if( defined $user and defined $pass ) {
+      $request->authorization_basic( $user, $pass );
+   }
+
+   $args{request} = $request;
+
+   return %args;
 }
 
 =head1 SUBCLASS METHODS
