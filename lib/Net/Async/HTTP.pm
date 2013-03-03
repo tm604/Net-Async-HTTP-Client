@@ -398,7 +398,7 @@ sub _do_one_request
 
    $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
 
-   $self->get_connection(
+   return $self->get_connection(
       host => $args{proxy_host} || $self->{proxy_host} || $host,
       port => $args{proxy_port} || $self->{proxy_port} || $port,
       SSL  => $ssl,
@@ -414,13 +414,13 @@ sub _do_one_request
          $conn->close;
       } ) if $timer;
 
-      $conn->request(
+      return $conn->request(
          request => $request,
          request_body => $request_body,
          previous_response => $args{previous_response},
          on_header => $args{on_header},
       );
-   } )->on_fail( $args{on_error} );
+   } );
 }
 
 sub _do_request
@@ -523,7 +523,7 @@ sub _do_request
       host => $host,
       port => $port,
       %args
-   );
+   )->on_fail( $args{on_error} );
 }
 
 sub do_request
