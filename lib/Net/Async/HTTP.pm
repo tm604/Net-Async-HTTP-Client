@@ -26,6 +26,8 @@ use HTTP::Request::Common qw();
 use IO::Async::Stream;
 use IO::Async::Loop 0.31; # for ->connect( extensions )
 
+use Future::Utils qw( repeat );
+
 use Socket qw( SOCK_STREAM );
 
 use constant HTTP_PORT  => 80;
@@ -426,42 +428,23 @@ sub _do_request
 
    my $timer = $args{timer};
 
-   my $uri = $args{request}->uri;
-   if( defined $uri->scheme and $uri->scheme =~ m/^http(s?)$/ ) {
-      $host = $uri->host if !defined $host;
-      $port = $uri->port if !defined $port;
-      $ssl = ( $uri->scheme eq "https" );
-   }
-
-   defined $host or croak "Expected 'host'";
-   defined $port or $port = ( $ssl ? HTTPS_PORT : HTTP_PORT );
-
    my $on_header = delete $args{on_header} or croak "Expected 'on_header' as a CODE ref";
    my $on_error  = $args{on_error}  or croak "Expected 'on_error' as a CODE ref";
 
-   my $max_redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
+   my $redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
 
-   my $on_header_redir = $self->_capture_weakself( sub {
+   my $request = $args{request};
+   my $response;
+   # Defeat prototype
+   my $future = &repeat( $self->_capture_weakself( sub {
       my $self = shift;
-      return if $timer and $timer->expired;
+      my ( $previous_f ) = @_;
 
-      $timer->set_on_expire( sub {
-         $on_error->( "Timed out" );
-      } ) if $timer;
+      if( $previous_f ) {
+         my $previous_response = $previous_f->get;
+         $args{previous_response} = $previous_response;
 
-      my ( $response ) = @_;
-
-      if( !$response->is_redirect or $max_redirects == 0 ) {
-         $self->process_response( $response );
-
-         return $on_header->( $response );
-      }
-
-      # Ignore body but handle redirect at the end of it
-      return sub {
-         return if @_;
-
-         my $location = $response->header( "Location" );
+         my $location = $previous_response->header( "Location" );
 
          if( $location =~ m{^http(?:s?)://} ) {
             # skip
@@ -472,32 +455,65 @@ sub _do_request
          }
          else {
             $on_error->( "Unrecognised Location: $location" );
-            return;
+            return 1;
          }
 
          my $loc_uri = URI->new( $location );
          unless( $loc_uri ) {
             $on_error->( "Unable to parse '$location' as a URI" );
-            return;
+            return 1;
          }
 
-         $args{on_redirect}->( $response, $location ) if $args{on_redirect};
+         $args{on_redirect}->( $previous_response, $location ) if $args{on_redirect};
 
-         $self->_do_request( $self->_make_request_for_uri( $loc_uri,
-            %args,
-            on_header => $on_header,
-            max_redirects => $max_redirects - 1,
-            previous_response => $response,
-         ) );
+         %args = $self->_make_request_for_uri( $loc_uri, %args );
       }
+
+      my $uri = $request->uri;
+      if( defined $uri->scheme and $uri->scheme =~ m/^http(s?)$/ ) {
+         $host = $uri->host if !defined $host;
+         $port = $uri->port if !defined $port;
+         $ssl = ( $uri->scheme eq "https" );
+      }
+
+      defined $host or croak "Expected 'host'";
+      defined $port or $port = ( $ssl ? HTTPS_PORT : HTTP_PORT );
+
+      $self->_do_one_request(
+         host => $host,
+         port => $port,
+         %args,
+         on_header => $self->_capture_weakself( sub {
+            my $self = shift;
+            return if $timer and $timer->expired;
+
+            $timer->set_on_expire( sub {
+               $on_error->( "Timed out" );
+            } ) if $timer;
+
+            ( $response ) = @_;
+
+            return $on_header->( $response ) unless $response->is_redirect;
+
+            # Consume and discard the entire body of a redirect
+            return sub {
+               return if @_;
+               return $response;
+            };
+         } ),
+      );
+   } ),
+   while => sub {
+      my $f = shift;
+      return 0 if $f->failure;
+      return $response->is_redirect && $redirects--;
    } );
 
-   $self->_do_one_request(
-      on_header => $on_header_redir,
-      host => $host,
-      port => $port,
-      %args
-   )->on_fail( $args{on_error} );
+   return $future->on_done( $self->_capture_weakself( sub {
+      my $self = shift;
+      my $response = shift;
+      $self->process_response( $response );
+   } ) )->on_fail( $args{on_error} );
 }
 
 sub do_request
