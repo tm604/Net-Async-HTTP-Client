@@ -378,7 +378,7 @@ fail with the same error.
 
 =cut
 
-sub do_request
+sub _do_request
 {
    my $self = shift;
    my %args = @_;
@@ -394,7 +394,20 @@ sub do_request
 
    my $host = delete $args{host};
    my $port = delete $args{port};
-   my $ssl;
+   my $ssl  = delete $args{SSL};
+
+   my $request = delete $args{request};
+   ref $request and $request->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
+
+   my $uri = $request->uri;
+   if( defined $uri->scheme and $uri->scheme =~ m/^http(s?)$/ ) {
+      $host = $uri->host if !defined $host;
+      $port = $uri->port if !defined $port;
+      $ssl = ( $uri->scheme eq "https" );
+   }
+
+   defined $host or croak "Expected 'host'";
+   defined $port or $port = ( $ssl ? HTTPS_PORT : HTTP_PORT );
 
    my $timer = $args{timer};
    if( !$timer and defined $timeout ) {
@@ -472,75 +485,15 @@ sub do_request
          $args{timer} = $timer;
 
          $self->do_request(
-            %args,
             uri => $loc_uri,
+            %args,
             max_redirects => $max_redirects - 1,
             previous_response => $response,
          );
       }
    } );
 
-   my $request;
-   if( $args{request} ) {
-      $request = delete $args{request};
-      ref $request and $request->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
-
-      $ssl = $args{SSL};
-
-      my $uri = $request->uri;
-      if( defined $uri->scheme and $uri->scheme =~ m/^http(s?)$/ ) {
-         $host = $uri->host if !defined $host;
-         $port = $uri->port if !defined $port;
-         $ssl = ( $uri->scheme eq "https" );
-      }
-   }
-   elsif( $args{uri} ) {
-      my $uri = delete $args{uri};
-      ref $uri and $uri->isa( "URI" ) or croak "Expected 'uri' as a URI reference";
-
-      my $method = delete $args{method} || "GET";
-
-      $host = $uri->host;
-      $port = $uri->port;
-
-      $ssl = ( $uri->scheme eq "https" );
-
-      if( $method eq "POST" ) {
-         defined $args{content} or croak "Expected 'content' with POST method";
-
-         # Lack of content_type didn't used to be a failure condition:
-         ref $args{content} or defined $args{content_type} or
-            carp "No 'content_type' was given with 'content'";
-
-         # This will automatically encode a form for us
-         $request = HTTP::Request::Common::POST( $uri, Content => $args{content}, Content_Type => $args{content_type} );
-      }
-      else {
-         $request = HTTP::Request->new( $method, $uri );
-      }
-
-      $request->protocol( "HTTP/1.1" );
-      $request->header( Host => $host );
-
-      my ( $user, $pass );
-
-      if( defined $uri->userinfo ) {
-         ( $user, $pass ) = split( m/:/, $uri->userinfo, 2 );
-      }
-      elsif( defined $args{user} and defined $args{pass} ) {
-         $user = $args{user};
-         $pass = $args{pass};
-      }
-
-      if( defined $user and defined $pass ) {
-         $request->authorization_basic( $user, $pass );
-      }
-   }
-
    $self->prepare_request( $request );
-
-   defined $host or croak "Expected 'host'";
-   defined $port or $port = ( $ssl ? HTTPS_PORT : HTTP_PORT );
 
    $timer->configure( notifier_name => "$host:$port/..." ) if $timer;
 
@@ -567,6 +520,59 @@ sub do_request
          on_header => $on_header_redir,
       );
    } )->on_fail( $on_error );
+}
+
+sub do_request
+{
+   my $self = shift;
+   my %args = @_;
+
+   if( my $uri = delete $args{uri} ) {
+      ref $uri and $uri->isa( "URI" ) or croak "Expected 'uri' as a URI reference";
+
+      my $method = delete $args{method} || "GET";
+
+      $args{host} = $uri->host;
+      $args{port} = $uri->port;
+      $args{SSL}  = ( $uri->scheme eq "https" );
+
+      my $request;
+
+      if( $method eq "POST" ) {
+         defined $args{content} or croak "Expected 'content' with POST method";
+
+         # Lack of content_type didn't used to be a failure condition:
+         ref $args{content} or defined $args{content_type} or
+         carp "No 'content_type' was given with 'content'";
+
+         # This will automatically encode a form for us
+         $request = HTTP::Request::Common::POST( $uri, Content => $args{content}, Content_Type => $args{content_type} );
+      }
+      else {
+         $request = HTTP::Request->new( $method, $uri );
+      }
+
+      $request->protocol( "HTTP/1.1" );
+      $request->header( Host => $uri->host );
+
+      my ( $user, $pass );
+
+      if( defined $uri->userinfo ) {
+         ( $user, $pass ) = split( m/:/, $uri->userinfo, 2 );
+      }
+      elsif( defined $args{user} and defined $args{pass} ) {
+         $user = $args{user};
+         $pass = $args{pass};
+      }
+
+      if( defined $user and defined $pass ) {
+         $request->authorization_basic( $user, $pass );
+      }
+
+      $args{request} = $request;
+   }
+
+   $self->_do_request( %args );
 }
 
 =head1 SUBCLASS METHODS
