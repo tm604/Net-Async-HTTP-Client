@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 11;
+use Test::More;
 use Test::Refcount;
 use IO::Async::Test;
 use IO::Async::Loop;
@@ -123,3 +123,5 @@ local *Net::Async::HTTP::Protocol::connect = sub {
 $loop->remove( $http );
 
 is_oneref( $http, '$http has refcount 1 before EOF' );
+
+done_testing;

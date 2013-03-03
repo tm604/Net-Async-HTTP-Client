@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 1;
+use Test::More;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -61,3 +61,5 @@ wait_for { $resp[0] };
 wait_for { $err[0] };
 
 like( $err[0], qr/^Connection closed/, 'Queued request gets connection closed error' );
+
+done_testing;

@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 13;
+use Test::More;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -179,3 +179,5 @@ $loop->add( $http );
    is( $response->content_type, "text/plain", 'Content type of final response to local redirect' );
    is( $response->content, "Directory", 'Content of final response to local redirect' );
 }
+
+done_testing;

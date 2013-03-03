@@ -14,8 +14,6 @@ eval {
    IO::Async::SSL->VERSION( 0.04 );
 } or plan skip_all => "No IO::Async::SSL";
 
-plan tests => 2;
-
 my $CRLF = "\x0d\x0a"; # because \r\n isn't portable
 
 my $loop = IO::Async::Loop->new();
@@ -97,3 +95,5 @@ wait_for { defined $response };
 
 is( $response->content_type, "text/plain", '$response->content_type' );
 is( $response->content, "OK", '$response->content' );
+
+done_testing;

@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 3 * 14;
+use Test::More;
 use IO::Async::Test;
 use IO::Async::Loop;
 
@@ -178,3 +178,5 @@ foreach my $close ( 0, 1, 2 ) {
    undef $peersock;
    wait_for { scalar $http->children == 0 };
 }
+
+done_testing;

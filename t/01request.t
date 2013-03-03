@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 87;
+use Test::More;
 use Test::Identity;
 use IO::Async::Test;
 use IO::Async::Loop;
@@ -448,3 +448,5 @@ do_test_req( "request-implied host",
 
    expect_res_code => 200,
 );
+
+done_testing;
