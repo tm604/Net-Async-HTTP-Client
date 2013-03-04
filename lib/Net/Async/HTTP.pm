@@ -459,14 +459,12 @@ sub _do_request
             $location = "http://$hostport" . $location;
          }
          else {
-            $on_error->( "Unrecognised Location: $location" );
-            return 1;
+            return $self->loop->new_future->fail( "Unrecognised Location: $location" );
          }
 
          my $loc_uri = URI->new( $location );
          unless( $loc_uri ) {
-            $on_error->( "Unable to parse '$location' as a URI" );
-            return 1;
+            return $self->loop->new_future->fail( "Unable to parse '$location' as a URI" );
          }
 
          $args{on_redirect}->( $previous_response, $location ) if $args{on_redirect};
