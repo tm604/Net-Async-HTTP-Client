@@ -381,7 +381,8 @@ fail with the same error.
 =head2 $future = $http->do_request( %args )
 
 This method also returns a L<Future>, which will eventually yield the (final
-non-redirect) C<HTTP::Response>.
+non-redirect) C<HTTP::Response>. If returning a future, then the
+C<on_response>, C<on_header> and C<on_error> callbacks are optional.
 
 =cut
 
@@ -433,8 +434,8 @@ sub _do_request
 
    my $timer = $args{timer};
 
-   my $on_header = delete $args{on_header} or croak "Expected 'on_header' as a CODE ref";
-   my $on_error  = $args{on_error}  or croak "Expected 'on_error' as a CODE ref";
+   my $on_header = delete $args{on_header};
+   my $on_error  = $args{on_error};
 
    my $redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
 
@@ -512,11 +513,15 @@ sub _do_request
       return $response->is_redirect && $redirects--;
    } );
 
-   return $future->on_done( $self->_capture_weakself( sub {
+   $future->on_done( $self->_capture_weakself( sub {
       my $self = shift;
       my $response = shift;
       $self->process_response( $response );
-   } ) )->on_fail( $args{on_error} );
+   } ) );
+
+   $future->on_fail( $args{on_error} ) if $args{on_error};
+
+   return $future;
 }
 
 sub do_request
@@ -531,7 +536,7 @@ sub do_request
    if( $args{on_header} ) {
       # ok
    }
-   elsif( my $on_response = delete $args{on_response} ) {
+   elsif( my $on_response = delete $args{on_response} or defined wantarray ) {
       $args{on_header} = sub {
          my ( $response ) = @_;
          return sub {
@@ -539,14 +544,14 @@ sub do_request
                $response->add_content( @_ );
             }
             else {
-               $on_response->( $response );
+               $on_response->( $response ) if $on_response;
                return $response;
             }
          };
       }
    }
    else {
-      croak "Expected 'on_response' or 'on_header' as CODE ref";
+      croak "Expected 'on_response' or 'on_header' as CODE ref or to return a Future";
    }
 
    my $timeout = defined $args{timeout} ? $args{timeout} : $self->{timeout};
