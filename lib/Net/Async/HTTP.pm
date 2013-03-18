@@ -626,6 +626,27 @@ sub _make_request_for_uri
    return %args;
 }
 
+=head2 $future = $http->GET( $uri, %args )
+
+=head2 $future = $http->HEAD( $uri, %args )
+
+Convenient wrappers for using the C<GET> or C<HEAD> methods with a C<URI>
+object and few if any other arguments, returning a C<Future>.
+
+=cut
+
+sub GET
+{
+   my $self = shift;
+   return $self->do_request( method => "GET", uri => @_ );
+}
+
+sub HEAD
+{
+   my $self = shift;
+   return $self->do_request( method => "HEAD", uri => @_ );
+}
+
 =head1 SUBCLASS METHODS
 
 The following methods are intended as points for subclasses to override, to
@@ -664,6 +685,38 @@ sub process_response
 
    $self->{cookie_jar}->extract_cookies( $response ) if $self->{cookie_jar};
 }
+
+=head1 EXAMPLES
+
+=head2 Concurrent GET
+
+The C<Future>-returning C<GET> method makes it easy to await multiple URLs at
+once.
+
+ my @URLs = ( ... );
+
+ my $http = Net::Async::HTTP->new( ... );
+ $loop->add( $http );
+
+ my $future = Future->wait_all(
+    map {
+       my $url = $_;
+       $http->GET( $url )
+            ->on_done( sub {
+               my $response = shift;
+               say "$url succeeded: ", $response->code;
+               say "  Content-Type":", $response->content_type;
+            } )
+            ->on_fail( sub {
+               my $failure = shift;
+               say "$url failed: $failure";
+            } );
+    } @URLs
+ );
+
+ $loop->await( $future );
+
+=cut
 
 =head1 SEE ALSO
 
