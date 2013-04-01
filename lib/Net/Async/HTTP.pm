@@ -511,7 +511,8 @@ sub _do_request
       my $f = shift;
       return 0 if $f->failure;
       return $response->is_redirect && $redirects--;
-   } );
+   },
+   return => $self->loop->new_future );
 
    $future->on_done( $self->_capture_weakself( sub {
       my $self = shift;
