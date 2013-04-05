@@ -435,12 +435,12 @@ sub _do_request
    my $timer = $args{timer};
 
    my $on_header = delete $args{on_header};
-   my $on_error  = $args{on_error};
 
    my $redirects = defined $args{max_redirects} ? $args{max_redirects} : $self->{max_redirects};
 
    my $request = $args{request};
    my $response;
+   my $reqf;
    # Defeat prototype
    my $future = &repeat( $self->_capture_weakself( sub {
       my $self = shift;
@@ -483,18 +483,13 @@ sub _do_request
       defined $host or croak "Expected 'host'";
       defined $port or $port = ( $ssl ? HTTPS_PORT : HTTP_PORT );
 
-      $self->_do_one_request(
+      return $reqf = $self->_do_one_request(
          host => $host,
          port => $port,
          %args,
          on_header => $self->_capture_weakself( sub {
             my $self = shift;
             return if $timer and $timer->expired;
-
-            $timer->set_on_expire( sub {
-               $on_error->( "Timed out" );
-            } ) if $timer;
-
             ( $response ) = @_;
 
             return $on_header->( $response ) unless $response->is_redirect;
@@ -509,10 +504,15 @@ sub _do_request
    } ),
    while => sub {
       my $f = shift;
-      return 0 if $f->failure;
+      return 0 if $f->failure or $f->is_cancelled;
       return $response->is_redirect && $redirects--;
    },
    return => $self->loop->new_future );
+
+   $timer->set_on_expire( sub {
+      $future->fail( "Timed out" );
+      $reqf->cancel if $reqf;
+   } ) if $timer;
 
    $future->on_done( $self->_capture_weakself( sub {
       my $self = shift;
