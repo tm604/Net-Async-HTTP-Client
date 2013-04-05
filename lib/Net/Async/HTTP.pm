@@ -514,14 +514,6 @@ sub _do_request
       $reqf->cancel if $reqf;
    } ) if $timer;
 
-   $future->on_done( $self->_capture_weakself( sub {
-      my $self = shift;
-      my $response = shift;
-      $self->process_response( $response );
-   } ) );
-
-   $future->on_fail( $args{on_error} ) if $args{on_error};
-
    return $future;
 }
 
@@ -573,7 +565,17 @@ sub do_request
       $args{timer} = $timer;
    }
 
-   $self->_do_request( %args );
+   my $future = $self->_do_request( %args );
+
+   $future->on_done( $self->_capture_weakself( sub {
+      my $self = shift;
+      my $response = shift;
+      $self->process_response( $response );
+   } ) );
+
+   $future->on_fail( $args{on_error} ) if $args{on_error};
+
+   return $future;
 }
 
 sub _make_request_for_uri
