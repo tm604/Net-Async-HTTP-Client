@@ -372,8 +372,7 @@ default to the value given in the constructor.
 
 Optional. Specifies a timeout in seconds, after which to give up on the
 request and fail it with an error. If this happens, the error message will be
-C<Timed out>. Any other pipelined requests using the same connection will also
-fail with the same error.
+C<Timed out>.
 
 =back
 
