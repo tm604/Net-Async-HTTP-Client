@@ -144,6 +144,19 @@ Optional. Parameters to pass on to the C<connect> method used to connect
 sockets to HTTP servers. Sets the local socket address to C<bind()> to. For
 more detail, see the documentation in L<IO::Async::Connector>.
 
+=item fail_on_error => BOOL
+
+Optional. Affects the behaviour of response handling when a C<4xx> or C<5xx>
+response code is received. When false, these responses will be processed as
+other responses and passed to the C<on_response> callback, or used to set the
+successful result of the Future. When true, such an error response causes the
+C<on_error> handling or a failed Future instead. The HTTP response and request
+objects will be passed as well as the code and message.
+
+ $on_error->( "$code $message", $response, $request )
+
+ ( $code_message, $response, $request ) = $f->failure
+
 =back
 
 =cut
@@ -155,7 +168,7 @@ sub configure
 
    foreach (qw( user_agent max_redirects max_in_flight
       timeout proxy_host proxy_port cookie_jar pipeline local_host local_port
-      local_addrs local_addr ))
+      local_addrs local_addr fail_on_error ))
    {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
@@ -355,6 +368,12 @@ or obtain the response. It will be passed an error message.
 
  $on_error->( $message )
 
+If this is invoked because of a received C<4xx> or C<5xx> error code in an
+HTTP response, it will be invoked with the response and request objects as
+well.
+
+ $on_error->( $message, $response, $request )
+
 =item on_redirect => CODE
 
 Optional. A callback that is invoked if a redirect response is received,
@@ -492,6 +511,23 @@ sub _do_request
       return $response->is_redirect && $redirects--;
    },
    return => $self->loop->new_future );
+
+   if( $self->{fail_on_error} ) {
+      $future = $future->and_then( sub {
+         my $f = shift;
+         my $resp = $f->get;
+         my $code = $resp->code;
+
+         if( $code =~ m/^[45]/ ) {
+            my $message = $resp->message;
+            $message =~ s/\r$//; # HTTP::Message bug
+
+            return Future->new->fail( "$code $message", $resp, $request );
+         }
+
+         return $resp;
+      });
+   }
 
    return $future;
 }
