@@ -400,10 +400,8 @@ sub _do_one_request
       port => $args{proxy_port} || $self->{proxy_port} || $port,
       SSL  => $args{SSL},
       ( map { m/^SSL_/ ? ( $_ => $args{$_} ) : () } keys %args ),
-   )->and_then( sub {
-      my ( $f ) = @_;
-
-      my ( $conn ) = $f->get;
+   )->then( sub {
+      my ( $conn ) = @_;
 
       return $conn->request(
          request => $request,
