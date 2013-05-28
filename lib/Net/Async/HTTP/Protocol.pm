@@ -257,7 +257,7 @@ sub request
             s/^\s+//, s/\s+$// for $value;
             push @headers, $name => $value;
          } );
-         $header->header( @headers );
+         $header->header( @headers ) if @headers;
       }
 
       my $protocol = $header->protocol;
