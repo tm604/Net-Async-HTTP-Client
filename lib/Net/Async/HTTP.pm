@@ -322,6 +322,13 @@ F<examples/PUT.pl>.
 
 The type of non-form data C<content>.
 
+=item expect_continue => BOOL
+
+Optional. If true, sets the C<Expect> request header to the value
+C<100-continue> and does not send the C<request_body> parameter until a
+C<100 Continue> response is received from the server. If an error response is
+received then the C<request_body> code, if present, will not be invoked.
+
 =item user => STRING
 
 =item pass => STRING

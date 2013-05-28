@@ -228,11 +228,16 @@ sub request
    $self->debug_printf( "REQUEST %s", $req->uri );
 
    my $request_body = $args{request_body};
+   my $expect_continue = !!$args{expect_continue};
 
    my $method = $req->method;
 
    if( $method eq "POST" or $method eq "PUT" or length $req->content ) {
       $req->init_header( "Content-Length", length $req->content );
+   }
+
+   if( $expect_continue ) {
+      $req->init_header( "Expect", "100-continue" );
    }
 
    my $f = $self->loop->new_future;
@@ -267,6 +272,7 @@ sub request
 
       if( $header->code =~ m/^1/ ) { # 1xx is not a final response
          $self->debug_printf( "HEADER [provisional] %s", $header->status_line );
+         $self->write( $request_body ) if $request_body and $expect_continue;
          return 1;
       }
 
@@ -449,7 +455,7 @@ sub request
                  $CRLF . $CRLF .
                  $req->content );
 
-   $self->write( $request_body ) if $request_body;
+   $self->write( $request_body ) if $request_body and !$expect_continue;
 
    $self->{requests_in_flight}++;
 

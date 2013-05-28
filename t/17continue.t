@@ -35,12 +35,18 @@ local *Net::Async::HTTP::Protocol::connect = sub {
    );
 };
 
+my $body_sent;
 my $resp;
 $http->do_request(
    method => "PUT",
    uri    => URI->new( "http://host0/" ),
-   content => "Here is my content$CRLF",
+   expect_continue => 1,
    content_type => "text/plain",
+   request_body => sub {
+      return undef if $body_sent;
+      $body_sent++;
+      return "Here is the body content\n";
+   },
    on_response => sub { $resp = shift },
    on_error    => sub { die "Test failed early - $_[-1]" },
 );
@@ -49,12 +55,18 @@ wait_for { defined $peersock };
 
 my $request_stream = "";
 wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
-$request_stream =~ s/^.*?$CRLF$CRLF//;
+$request_stream =~ s/^(.*?$CRLF$CRLF)//s;
+my $header = HTTP::Request->parse( $1 );
+
+is( $header->header( "Expect" ), "100-continue", 'Received Expect header' );
+
+ok( !$body_sent, 'request_body not yet invoked before 100 Continue' );
 
 $peersock->print( "HTTP/1.1 100 Continue$CRLF" .
                   $CRLF );
 
-# ok( !defined $resp, '$resp not yet defined after 100 Continue' );
+wait_for { $body_sent };
+ok( !defined $resp, '$resp not yet defined after 100 Continue' );
 
 $peersock->print( "HTTP/1.1 201 Created$CRLF" .
                   "Content-Length: 0$CRLF" .
