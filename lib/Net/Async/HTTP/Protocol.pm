@@ -265,6 +265,11 @@ sub request
          $self->{can_pipeline} = 1;
       }
 
+      if( $header->code =~ m/^1/ ) { # 1xx is not a final response
+         $self->debug_printf( "HEADER [provisional] %s", $header->status_line );
+         return 1;
+      }
+
       $header->request( $req );
       $header->previous( $args{previous_response} ) if $args{previous_response};
 
