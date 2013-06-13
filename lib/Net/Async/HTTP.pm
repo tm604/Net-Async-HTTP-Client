@@ -331,9 +331,10 @@ sub get_connection
    my $key = "$host:$port";
    my $conns = $self->{connections}{$key} ||= [];
 
-   # Have a look to see if there are any idle ones first
+   # Have a look to see if there are any idle connected ones first
    foreach my $conn ( @$conns ) {
-      $conn->is_idle and return $conn->new_ready_future;
+      $conn->is_idle and $conn->transport
+         and return $self->loop->new_future->done( $conn );
    }
 
    if( !$self->{max_connections_per_host} or @$conns < $self->{max_connections_per_host} ) {
