@@ -199,38 +199,28 @@ sub configure
 
 =cut
 
-sub get_connection
+sub new_connection
 {
    my $self = shift;
    my %args = @_;
 
-   my $loop = $self->get_loop or croak "Cannot ->get_connection without a Loop";
-
    my $host = delete $args{host};
    my $port = delete $args{port};
 
-   my $connections = $self->{connections};
-   my $key = "$host:$port";
-
-   if( my $conn = $connections->{$key} ) {
-      return $conn->new_ready_future;
-   }
+   my $on_closed = $args{on_closed};
 
    my $conn = Net::Async::HTTP::Protocol->new(
-      notifier_name => $key,
+      notifier_name => "$host:$port",
       max_in_flight => $self->{max_in_flight},
       pipeline => $self->{pipeline},
       on_closed => sub {
          my $conn = shift;
 
          $conn->remove_from_parent;
-         delete $connections->{$key};
+         $on_closed->() if $on_closed;
       },
    );
-
    $self->add_child( $conn );
-
-   $connections->{$key} = $conn;
 
    my $f = $conn->new_ready_future;
 
@@ -241,7 +231,6 @@ sub get_connection
       push @{ $args{extensions} }, "SSL";
 
       $args{on_ssl_error} = sub {
-         delete $connections->{$key};
          $f->fail( "$host:$port SSL error [$_[0]]" );
       };
    }
@@ -261,12 +250,10 @@ sub get_connection
       },
 
       on_resolve_error => sub {
-         delete $connections->{$key};
          $f->fail( "$host:$port not resolvable [$_[0]]" );
       },
 
       on_connect_error => sub {
-         delete $connections->{$key};
          $f->fail( "$host:$port not contactable [$_[-1]]" );
       },
 
@@ -275,7 +262,34 @@ sub get_connection
       ( map { defined $self->{$_} ? ( $_ => $self->{$_} ) : () } qw( local_host local_port local_addrs local_addr ) ),
    );
 
-   return $f;
+   return ( $conn, $f );
+}
+
+sub get_connection
+{
+   my $self = shift;
+   my %args = @_;
+
+   my $loop = $self->get_loop or croak "Cannot ->get_connection without a Loop";
+
+   my $host = $args{host};
+   my $port = $args{port};
+
+   my $connections = $self->{connections};
+   my $key = "$host:$port";
+
+   if( my $conn = $connections->{$key} ) {
+      return $conn->new_ready_future;
+   }
+   else {
+      my ( $conn, $f ) = $self->new_connection( %args,
+         on_closed => sub { delete $connections->{$key} },
+      );
+      $connections->{$key} = $conn;
+      $f->on_fail( sub { delete $connections->{$key} } );
+
+      return $f;
+   }
 }
 
 =head2 $http->do_request( %args )
