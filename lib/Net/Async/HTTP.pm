@@ -82,6 +82,50 @@ This module optionally supports SSL connections, if L<IO::Async::SSL> is
 installed. If so, SSL can be requested either by passing a URI with the
 C<https> scheme, or by passing a true value as the C<SSL> parameter.
 
+=head2 Connection Pooling
+
+There are three ways in which connections to HTTP server hosts are managed by
+this object, controlled by the value of C<max_connections_per_host>. This
+controls when new connections are established to servers, as compared to
+waiting for existing connections to be free, as new requests are made to them.
+
+They are:
+
+=over 2
+
+=item max_connections_per_host = 1
+
+This is the default setting. In this mode, there will be one connection per
+host on which there are active or pending requests. If new requests are made
+while an existing one is outstanding, they will be queued to wait for it.
+
+If pipelining is active on the connection (because both the C<pipeline> option
+is true and the connection is known to be an HTTP/1.1 server), then requests
+will be pipelined into the connection awaiting their response. If not, they
+will be queued awaiting a response to the previous before sending the next.
+
+=item max_connections_per_host > 1
+
+In this mode, there can be more than one connection per host. If a new request
+is made, it will try to re-use idle connections if there are any, or if they
+are all busy it will create a new connection to the host, up to the configured
+limit.
+
+I<NOTE>: beyond this limit, they are all pipelined into the [0] connection.
+This behaviour will be fixed soon. :)
+
+=item max_connections_per_host = 0
+
+In this mode, there is no upper limit to the number of connections per host.
+Every new request will try to reuse an idle connection, or else create a new
+one if all the existing ones are busy.
+
+=back
+
+These modes all apply per hostname / server port pair; they do not affect the
+behaviour of connections made to differing hostnames, or differing ports on
+the same hostname.
+
 =cut
 
 sub _init
@@ -92,6 +136,8 @@ sub _init
 
    $self->{read_len}  = READ_LEN;
    $self->{write_len} = WRITE_LEN;
+
+   $self->{max_connections_per_host} = 1;
 }
 
 =head1 PARAMETERS
@@ -117,6 +163,13 @@ pipelining is enabled and supported on that host. If more requests are made
 over this limit they will be queued internally by the object and not sent to
 the server until responses are received. If not supplied, will default to 4.
 Give 0 to disable the limit entirely.
+
+=item max_connections_per_host => INT
+
+Optional. Controls the maximum number of connections per hostname/server port
+pair, before requests will be queued awaiting one to be free. If not supplied,
+will default to 1. Give 0 to disable the limit entirely. See also the
+L</Connection Pooling> section documented above.
 
 =item timeout => NUM
 
@@ -180,7 +233,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( user_agent max_redirects max_in_flight
+   foreach (qw( user_agent max_redirects max_in_flight max_connections_per_host
       timeout proxy_host proxy_port cookie_jar pipeline local_host local_port
       local_addrs local_addr fail_on_error read_len write_len ))
    {
@@ -283,7 +336,7 @@ sub get_connection
       $conn->is_idle and return $conn->new_ready_future;
    }
 
-   if( @$conns < 1 ) { # TODO: configurable limit
+   if( !$self->{max_connections_per_host} or @$conns < $self->{max_connections_per_host} ) {
       my ( $conn, $f ) = $self->new_connection( %args,
          on_closed => sub {
             my $conn = shift;
@@ -297,8 +350,8 @@ sub get_connection
       return $f;
    }
 
-   # TODO: This logic will eventually suck once we have >1 connection, as we
-   # won't be able to know which is best. Maybe @conns > 1 ==> no pipeline?
+   # TODO: This logic will suck if we have >1 connection, as we won't be able
+   # to know which is best. Maybe @conns > 1 ==> no pipeline?
    return $conns->[0]->new_ready_future;
 }
 
