@@ -12,7 +12,7 @@ my $build = Module::Build->new(
       'HTTP::Request::Common' => 0,
       'HTTP::Response' => 0,
       'IO::Async::Loop' => '0.56',
-      'IO::Async::Protocol::Stream' => '0.34',
+      'IO::Async::Protocol::Stream' => '0.58',
       'IO::Async::Stream' => 0,
       'URI' => 0,
    },

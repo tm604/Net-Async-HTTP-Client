@@ -70,31 +70,14 @@ sub configure
    $self->SUPER::configure( %params );
 }
 
-# TODO: IO::Async::Protocol::Stream ought to do this
 sub setup_transport
 {
    my $self = shift;
    my ( $transport ) = @_;
    $self->SUPER::setup_transport( $transport );
 
-   $transport->configure(
-      on_write_eof => $self->_replace_weakself( "on_write_eof" ),
-   );
-
    $self->debug_printf( "CONNECTED" );
    $self->ready;
-}
-
-sub teardown_transport
-{
-   my $self = shift;
-   my ( $transport ) = @_;
-
-   $transport->configure(
-      on_write_eof => undef,
-   );
-
-   $self->SUPER::teardown_transport( $transport );
 }
 
 sub should_pipeline
