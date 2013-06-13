@@ -48,7 +48,8 @@ $http->do_request(
 wait_for { $peersock };
 
 # CHEATING
-my $conn = $http->{connections}->{"$host:80"} or die "Unable to find connection object";
+my $conn = $http->{connections}->{"$host:80"}->[0] or die "Unable to find connection object";
+ref $conn eq "Net::Async::HTTP::Protocol" or die "Unable to find connection object";
 
 my $request_stream = "";
 wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;

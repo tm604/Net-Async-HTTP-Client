@@ -88,7 +88,7 @@ sub _init
 {
    my $self = shift;
 
-   $self->{connections} = {}; # { "$host:$port" } -> $conn
+   $self->{connections} = {}; # { "$host:$port" } -> [ @connections ]
 
    $self->{read_len}  = READ_LEN;
    $self->{write_len} = WRITE_LEN;
@@ -217,7 +217,7 @@ sub new_connection
          my $conn = shift;
 
          $conn->remove_from_parent;
-         $on_closed->() if $on_closed;
+         $on_closed->( $conn ) if $on_closed;
       },
    );
    $self->add_child( $conn );
@@ -275,21 +275,31 @@ sub get_connection
    my $host = $args{host};
    my $port = $args{port};
 
-   my $connections = $self->{connections};
    my $key = "$host:$port";
+   my $conns = $self->{connections}{$key} ||= [];
 
-   if( my $conn = $connections->{$key} ) {
-      return $conn->new_ready_future;
+   # Have a look to see if there are any idle ones first
+   foreach my $conn ( @$conns ) {
+      $conn->is_idle and return $conn->new_ready_future;
    }
-   else {
+
+   if( @$conns < 1 ) { # TODO: configurable limit
       my ( $conn, $f ) = $self->new_connection( %args,
-         on_closed => sub { delete $connections->{$key} },
+         on_closed => sub {
+            my $conn = shift;
+            @$conns = grep { $_ != $conn } @$conns;
+         },
       );
-      $connections->{$key} = $conn;
-      $f->on_fail( sub { delete $connections->{$key} } );
+
+      push @$conns, $conn;
+      $f->on_fail( sub { @$conns = grep { $_ != $conn } @$conns } );
 
       return $f;
    }
+
+   # TODO: This logic will eventually suck once we have >1 connection, as we
+   # won't be able to know which is best. Maybe @conns > 1 ==> no pipeline?
+   return $conns->[0]->new_ready_future;
 }
 
 =head2 $http->do_request( %args )
