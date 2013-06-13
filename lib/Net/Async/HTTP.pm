@@ -32,6 +32,9 @@ use Socket qw( SOCK_STREAM );
 use constant HTTP_PORT  => 80;
 use constant HTTPS_PORT => 443;
 
+use constant READ_LEN  => 64*1024; # 64 KiB
+use constant WRITE_LEN => 64*1024; # 64 KiB
+
 =head1 NAME
 
 C<Net::Async::HTTP> - use HTTP with C<IO::Async>
@@ -86,6 +89,9 @@ sub _init
    my $self = shift;
 
    $self->{connections} = {}; # { "$host:$port" } -> $conn
+
+   $self->{read_len}  = READ_LEN;
+   $self->{write_len} = WRITE_LEN;
 }
 
 =head1 PARAMETERS
@@ -157,6 +163,14 @@ objects will be passed as well as the code and message.
 
  ( $code_message, $response, $request ) = $f->failure
 
+=item read_len => INT
+
+=item write_len => INT
+
+Optional. Used to set the reading and writing buffer lengths on the underlying
+C<IO::Async::Stream> objects that represent connections to the server. If not
+define, a default of 64 KiB will be used.
+
 =back
 
 =cut
@@ -168,7 +182,7 @@ sub configure
 
    foreach (qw( user_agent max_redirects max_in_flight
       timeout proxy_host proxy_port cookie_jar pipeline local_host local_port
-      local_addrs local_addr fail_on_error ))
+      local_addrs local_addr fail_on_error read_len write_len ))
    {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
@@ -235,6 +249,16 @@ sub get_connection
    $conn->connect(
       host     => $host,
       service  => $port,
+
+      on_connected => sub {
+         my $conn = shift;
+         my $stream = $conn->transport;
+
+         $stream->configure(
+            read_len  => $self->{read_len},
+            write_len => $self->{write_len},
+         );
+      },
 
       on_resolve_error => sub {
          delete $connections->{$key};
