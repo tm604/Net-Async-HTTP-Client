@@ -111,9 +111,6 @@ is made, it will try to re-use idle connections if there are any, or if they
 are all busy it will create a new connection to the host, up to the configured
 limit.
 
-I<NOTE>: beyond this limit, they are all pipelined into the [0] connection.
-This behaviour will be fixed soon. :)
-
 =item max_connections_per_host = 0
 
 In this mode, there is no upper limit to the number of connections per host.
