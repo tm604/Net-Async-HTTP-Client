@@ -261,11 +261,13 @@ sub new_connection
    my $port = delete $args{port};
 
    my $on_closed = $args{on_closed};
+   my $on_error  = $args{on_error};
 
    my $conn = Net::Async::HTTP::Protocol->new(
       notifier_name => "$host:$port",
       max_in_flight => $self->{max_in_flight},
       pipeline => $self->{pipeline},
+      ready_queue => $args{ready_queue},
       on_closed => sub {
          my $conn = shift;
 
@@ -275,8 +277,6 @@ sub new_connection
    );
    $self->add_child( $conn );
 
-   my $f = $conn->new_ready_future;
-
    if( $args{SSL} ) {
       require IO::Async::SSL;
       IO::Async::SSL->VERSION( 0.04 );
@@ -284,7 +284,7 @@ sub new_connection
       push @{ $args{extensions} }, "SSL";
 
       $args{on_ssl_error} = sub {
-         $f->fail( "$host:$port SSL error [$_[0]]" );
+         $on_error->( $conn, "$host:$port SSL error [$_[0]]" );
       };
    }
 
@@ -303,11 +303,11 @@ sub new_connection
       },
 
       on_resolve_error => sub {
-         $f->fail( "$host:$port not resolvable [$_[0]]" );
+         $on_error->( $conn, "$host:$port not resolvable [$_[0]]" );
       },
 
       on_connect_error => sub {
-         $f->fail( "$host:$port not contactable [$_[-1]]" );
+         $on_error->( $conn, "$host:$port not contactable [$_[-1]]" );
       },
 
       %args,
@@ -315,7 +315,7 @@ sub new_connection
       ( map { defined $self->{$_} ? ( $_ => $self->{$_} ) : () } qw( local_host local_port local_addrs local_addr ) ),
    );
 
-   return ( $conn, $f );
+   return $conn;
 }
 
 sub get_connection
@@ -330,15 +330,35 @@ sub get_connection
 
    my $key = "$host:$port";
    my $conns = $self->{connections}{$key} ||= [];
+   my $ready_queue = $self->{ready_queue}{$key} ||= [];
+
+   my $f = $args{future} || $self->loop->new_future;
 
    # Have a look to see if there are any idle connected ones first
    foreach my $conn ( @$conns ) {
       $conn->is_idle and $conn->transport
-         and return $self->loop->new_future->done( $conn );
+         and return $f->done( $conn );
    }
 
+   push @$ready_queue, $f unless $args{future};
+
    if( !$self->{max_connections_per_host} or @$conns < $self->{max_connections_per_host} ) {
-      my ( $conn, $f ) = $self->new_connection( %args,
+      my $conn = $self->new_connection( %args,
+         ready_queue => $ready_queue,
+
+         on_error => sub {
+            my $conn = shift;
+
+            $f->fail( @_ );
+
+            @$conns = grep { $_ != $conn } @$conns;
+            @$ready_queue = grep { $_ != $f } @$ready_queue;
+
+            if( @$ready_queue ) {
+               # Requeue another connection attempt as there's still more to do
+               $self->get_connection( %args, future => $ready_queue->[0] );
+            }
+         },
          on_closed => sub {
             my $conn = shift;
             @$conns = grep { $_ != $conn } @$conns;
@@ -346,14 +366,9 @@ sub get_connection
       );
 
       push @$conns, $conn;
-      $f->on_fail( sub { @$conns = grep { $_ != $conn } @$conns } );
-
-      return $f;
    }
 
-   # TODO: This logic will suck if we have >1 connection, as we won't be able
-   # to know which is best. Maybe @conns > 1 ==> no pipeline?
-   return $conns->[0]->new_ready_future;
+   return $f;
 }
 
 =head2 $http->do_request( %args )
