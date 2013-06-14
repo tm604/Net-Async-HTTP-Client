@@ -252,30 +252,17 @@ sub configure
 
 =cut
 
-sub new_connection
+sub connect_connection
 {
    my $self = shift;
    my %args = @_;
 
+   my $conn = delete $args{conn};
+
    my $host = delete $args{host};
    my $port = delete $args{port};
 
-   my $on_closed = $args{on_closed};
    my $on_error  = $args{on_error};
-
-   my $conn = Net::Async::HTTP::Protocol->new(
-      notifier_name => "$host:$port",
-      max_in_flight => $self->{max_in_flight},
-      pipeline => $self->{pipeline},
-      ready_queue => $args{ready_queue},
-      on_closed => sub {
-         my $conn = shift;
-
-         $conn->remove_from_parent;
-         $on_closed->( $conn ) if $on_closed;
-      },
-   );
-   $self->add_child( $conn );
 
    if( $args{SSL} ) {
       require IO::Async::SSL;
@@ -314,8 +301,6 @@ sub new_connection
 
       ( map { defined $self->{$_} ? ( $_ => $self->{$_} ) : () } qw( local_host local_port local_addrs local_addr ) ),
    );
-
-   return $conn;
 }
 
 sub get_connection
@@ -336,16 +321,30 @@ sub get_connection
 
    # Have a look to see if there are any idle connected ones first
    foreach my $conn ( @$conns ) {
-      $conn->is_idle and $conn->transport
-         and return $f->done( $conn );
+      $conn->is_idle and $conn->transport and return $f->done( $conn );
    }
 
    push @$ready_queue, $f unless $args{future};
 
    if( !$self->{max_connections_per_host} or @$conns < $self->{max_connections_per_host} ) {
-      my $conn = $self->new_connection( %args,
-         ready_queue => $ready_queue,
+      my $conn = Net::Async::HTTP::Protocol->new(
+         notifier_name => "$host:$port",
+         max_in_flight => $self->{max_in_flight},
+         pipeline      => $self->{pipeline},
+         ready_queue   => $ready_queue,
+         on_closed => sub {
+            my $conn = shift;
 
+            $conn->remove_from_parent;
+            @$conns = grep { $_ != $conn } @$conns;
+         },
+      );
+
+      $self->add_child( $conn );
+      push @$conns, $conn;
+
+      $self->connect_connection( %args,
+         conn => $conn,
          on_error => sub {
             my $conn = shift;
 
@@ -359,13 +358,7 @@ sub get_connection
                $self->get_connection( %args, future => $ready_queue->[0] );
             }
          },
-         on_closed => sub {
-            my $conn = shift;
-            @$conns = grep { $_ != $conn } @$conns;
-         },
       );
-
-      push @$conns, $conn;
    }
 
    return $f;
