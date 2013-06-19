@@ -825,28 +825,26 @@ sub process_response
 =head2 Concurrent GET
 
 The C<Future>-returning C<GET> method makes it easy to await multiple URLs at
-once.
+once, by using the L<Future::Utils> C<fmap_void> utility 
 
  my @URLs = ( ... );
 
  my $http = Net::Async::HTTP->new( ... );
  $loop->add( $http );
 
- my $future = Future->wait_all(
-    map {
-       my $url = $_;
-       $http->GET( $url )
-            ->on_done( sub {
-               my $response = shift;
-               say "$url succeeded: ", $response->code;
-               say "  Content-Type":", $response->content_type;
-            } )
-            ->on_fail( sub {
-               my $failure = shift;
-               say "$url failed: $failure";
-            } );
-    } @URLs
- );
+ my $future = fmap_void {
+    my ( $url ) = @_;
+    $http->GET( $url )
+         ->on_done( sub {
+            my $response = shift;
+            say "$url succeeded: ", $response->code;
+            say "  Content-Type":", $response->content_type;
+         } )
+         ->on_fail( sub {
+            my $failure = shift;
+            say "$url failed: $failure";
+         } );
+ } foreach => \@URLs;
 
  $loop->await( $future );
 
