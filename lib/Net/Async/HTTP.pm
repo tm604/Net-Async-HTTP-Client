@@ -604,6 +604,7 @@ sub _do_request
       return $reqf = $self->_do_one_request(
          host => $host,
          port => $port,
+         SSL  => $ssl,
          %args,
          on_header => $self->_capture_weakself( sub {
             my $self = shift;
@@ -720,7 +721,6 @@ sub _make_request_for_uri
 
    $args{host} = $uri->host;
    $args{port} = $uri->port;
-   $args{SSL}  = ( $uri->scheme eq "https" );
 
    my $request;
 
