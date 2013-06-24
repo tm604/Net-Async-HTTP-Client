@@ -27,10 +27,22 @@ use IO::Async::Loop 0.31; # for ->connect( extensions )
 
 use Future::Utils qw( repeat );
 
-use Socket 2.010 qw(
-   SOCK_STREAM IPPROTO_IP
-   IP_TOS IPTOS_LOWDELAY IPTOS_THROUGHPUT IPTOS_RELIABILITY IPTOS_MINCOST
-);
+use Socket qw( SOCK_STREAM IPPROTO_IP IP_TOS );
+BEGIN {
+   if( $Socket::VERSION >= '2.010' ) {
+      Socket->import(qw( IPTOS_LOWDELAY IPTOS_THROUGHPUT IPTOS_RELIABILITY IPTOS_MINCOST ));
+   }
+   else {
+      # These are portable constants, set in RFC 1349
+      require constant;
+      constant->import({
+         IPTOS_LOWDELAY    => 0x10,
+         IPTOS_THROUGHPUT  => 0x08,
+         IPTOS_RELIABILITY => 0x04,
+         IPTOS_MINCOST     => 0x02,
+      });
+   }
+}
 
 use constant HTTP_PORT  => 80;
 use constant HTTPS_PORT => 443;

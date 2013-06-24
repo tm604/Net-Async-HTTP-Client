@@ -14,7 +14,6 @@ my $build = Module::Build->new(
       'IO::Async::Loop' => '0.56',
       'IO::Async::Protocol::Stream' => '0.58',
       'IO::Async::Stream' => 0,
-      'Socket' => '2.010', # IPTOS_*
       'URI' => 0,
    },
    build_requires => {
