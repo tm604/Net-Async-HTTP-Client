@@ -894,6 +894,22 @@ L<http://tools.ietf.org/html/rfc2616> - Hypertext Transfer Protocol -- HTTP/1.1
 
 =back
 
+=head1 SPONSORS
+
+Parts of this code were paid for by
+
+=over 2
+
+=item *
+
+Socialflow L<http://www.socialflow.com>
+
+=item *
+
+Shadowcat Systems L<http://www.shadow.cat>
+
+=back
+
 =head1 AUTHOR
 
 Paul Evans <leonerd@leonerd.org.uk>
