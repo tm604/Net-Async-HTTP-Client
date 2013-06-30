@@ -317,7 +317,8 @@ sub connect_connection
             write_len => $self->{write_len},
          );
 
-         $stream->read_handle->setsockopt( IPPROTO_IP, IP_TOS, $self->{ip_tos} ) if defined $self->{ip_tos};
+         # Defend against ->setsockopt doing silly things like detecting SvPOK()
+         $stream->read_handle->setsockopt( IPPROTO_IP, IP_TOS, $self->{ip_tos}+0 ) if defined $self->{ip_tos};
       },
 
       on_resolve_error => sub {
