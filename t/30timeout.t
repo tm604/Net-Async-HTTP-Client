@@ -40,7 +40,7 @@ local *Net::Async::HTTP::Protocol::connect = sub {
    my $future = $http->do_request(
       uri => URI->new( "http://my.server/doc" ),
 
-      timeout => 1, # Really quick for testing
+      timeout => 0.1, # Really quick for testing
 
       on_response => sub { die "Test died early - got a response but shouldn't have" },
       on_error    => sub { $errcount++; $error = $_[0] },
@@ -66,7 +66,7 @@ local *Net::Async::HTTP::Protocol::connect = sub {
    my $future = $http->do_request(
       uri => URI->new( "http://my.server/redir" ),
 
-      timeout => 1, # Really quick for testing
+      timeout => 0.1, # Really quick for testing
 
       on_response => sub { die "Test died early - got a response but shouldn't have" },
       on_error    => sub { $errcount++; $error = $_[0] },
@@ -99,7 +99,7 @@ local *Net::Async::HTTP::Protocol::connect = sub {
    $http->do_request(
       uri => URI->new( "http://my.server/first" ),
 
-      timeout => 1, # Really quick for testing
+      timeout => 0.1, # Really quick for testing
 
       on_response => sub { die "Test died early - got a response but shouldn't have" },
       on_error    => sub { $errcount++; $error = $_[0] },
@@ -111,7 +111,7 @@ local *Net::Async::HTTP::Protocol::connect = sub {
    $http->do_request(
       uri => URI->new( "http://my.server/second" ),
 
-      timeout => 3,
+      timeout => 0.3,
 
       on_response => sub { die "Test died early - got a response but shouldn't have" },
       on_error    => sub { $errcount2++; $error2 = $_[0] },
