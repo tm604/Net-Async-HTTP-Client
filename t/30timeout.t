@@ -126,6 +126,58 @@ local *Net::Async::HTTP::Protocol::connect = sub {
    is( $errcount2, 1, 'on_error invoked once from pipeline(2)' );
 }
 
+# Stall during header read
+{
+   my $future = $http->do_request(
+      uri => URI->new( "http://stalling.server/header" ),
+
+      stall_timeout => 0.1,
+   );
+
+   # Don't write anything
+
+   wait_for { $future->is_ready };
+   is( scalar $future->failure, "Stalled while waiting for response", '$future->failure' );
+}
+
+# Stall during header read
+{
+   my $future = $http->do_request(
+      uri => URI->new( "http://stalling.server/read" ),
+
+      stall_timeout => 0.1,
+   );
+
+   my $request_stream = "";
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
+
+   $peersock->syswrite( "HTTP/1.1 200 OK$CRLF" .
+                        "Content-Length: 100$CRLF" ); # unfinished
+
+   wait_for { $future->is_ready };
+   is( scalar $future->failure, "Stalled while receiving response header", '$future->failure' );
+}
+
+# Stall during body read
+{
+   my $future = $http->do_request(
+      uri => URI->new( "http://stalling.server/read" ),
+
+      stall_timeout => 0.1,
+   );
+
+   my $request_stream = "";
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
+
+   $peersock->syswrite( "HTTP/1.1 200 OK$CRLF" .
+                        "Content-Length: 100$CRLF" .
+                        $CRLF );
+   $peersock->syswrite( "some of the content" ); # unfinished
+
+   wait_for { $future->is_ready };
+   is( scalar $future->failure, "Stalled while receiving body", '$future->failure' );
+}
+
 $loop->remove( $http );
 
 is_oneref( $http, '$http has refcount 1 before EOF' );
