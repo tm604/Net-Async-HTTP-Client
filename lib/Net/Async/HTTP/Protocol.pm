@@ -200,6 +200,11 @@ sub request
 
    my $f = $self->loop->new_future;
 
+   # TODO: Cancelling a request Future shouldn't necessarily close the socket
+   # if we haven't even started writing the request yet. But we can't know
+   # that currently.
+   $f->on_cancel( sub { $self->transport->close_now } );
+
    my $stall_timer;
    my $stall_reason;
    if( $args{stall_timeout} ) {
@@ -208,7 +213,7 @@ sub request
          on_expire => sub {
             my $self = shift;
 
-            $self->parent->close;
+            $self->parent->transport->close_now;
 
             $f->fail( "Stalled while $stall_reason" );
          }
