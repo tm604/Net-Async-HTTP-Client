@@ -61,6 +61,7 @@ sub configure
 
          $self->debug_printf( "CLOSED" );
 
+         undef $self->{ready_queue};
          $on_closed->( $self );
       };
    }
