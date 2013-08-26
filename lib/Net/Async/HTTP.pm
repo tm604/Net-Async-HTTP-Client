@@ -25,7 +25,7 @@ use HTTP::Request::Common qw();
 use IO::Async::Stream;
 use IO::Async::Loop 0.31; # for ->connect( extensions )
 
-use Future::Utils qw( repeat );
+use Future::Utils 0.16 qw( repeat );
 
 use Socket qw( SOCK_STREAM IPPROTO_IP IP_TOS );
 BEGIN {
@@ -671,8 +671,7 @@ sub _do_request
       my $f = shift;
       return 0 if $f->failure or $f->is_cancelled;
       return $response->is_redirect && $redirects--;
-   },
-   return => $self->loop->new_future );
+   } );
 
    if( $self->{fail_on_error} ) {
       $future = $future->and_then( sub {
