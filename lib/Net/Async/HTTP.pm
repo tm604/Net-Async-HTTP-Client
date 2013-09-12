@@ -190,10 +190,10 @@ supplied then no default will be applied, and no timeout will take place.
 
 =item stall_timeout => NUM
 
-Optional. How long in seconds to wait after each successful chunk of data is
-read from a socket, before giving up on a request. This may be more useful
-than C<timeout> on large-file operations, as it will not time out provided
-that regular progress is still being made.
+Optional. How long in seconds to wait after each write or read of data on a
+socket, before giving up on a request. This may be more useful than
+C<timeout> on large-file operations, as it will not time out provided that
+regular progress is still being made.
 
 =item proxy_host => STRING
 
