@@ -308,9 +308,11 @@ sub request
          return sub {
             my ( $self, $buffref, $closed ) = @_;
 
-            if( !defined $chunk_length ) {
+            if( !defined $chunk_length and $$buffref =~ s/^(.*?)$CRLF// ) {
+               my $header = $1;
+
                # Chunk header
-               unless( $$buffref =~ s/^([A-Fa-f0-9]+).*?$CRLF// ) {
+               unless( $header =~ s/^([A-Fa-f0-9]+).*// ) {
                   $f->fail( "Corrupted chunk header" ) unless $f->is_cancelled;
                   $self->close_now;
                   return 0;
