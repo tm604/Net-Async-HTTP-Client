@@ -184,7 +184,7 @@ sub request
    my $req = $args{request};
    ref $req and $req->isa( "HTTP::Request" ) or croak "Expected 'request' as a HTTP::Request reference";
 
-   $self->debug_printf( "REQUEST %s", $req->uri );
+   $self->debug_printf( "REQUEST %s %s", $req->method, $req->uri );
 
    my $request_body = $args{request_body};
    my $expect_continue = !!$args{expect_continue};
