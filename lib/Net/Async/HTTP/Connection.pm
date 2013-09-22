@@ -227,7 +227,8 @@ sub request
    }
 
    my $on_body_write;
-   if( $stall_timer or my $inner_on_body_write = $args{on_body_write} ) {
+   if( $stall_timer or $args{on_body_write} ) {
+      my $inner_on_body_write = $args{on_body_write};
       my $written = 0;
       $on_body_write = sub {
          $stall_timer->reset if $stall_timer;
