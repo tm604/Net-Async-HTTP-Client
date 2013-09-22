@@ -226,6 +226,15 @@ sub request
       $f->on_cancel( sub { $self->remove_child( $stall_timer ) } );
    }
 
+   my $on_body_write;
+   if( $stall_timer or my $inner_on_body_write = $args{on_body_write} ) {
+      my $written = 0;
+      $on_body_write = sub {
+         $stall_timer->reset if $stall_timer;
+         $inner_on_body_write->( $written += $_[1] ) if $inner_on_body_write;
+      };
+   }
+
    my $on_read = sub {
       my ( $self, $buffref, $closed ) = @_;
 
@@ -261,7 +270,8 @@ sub request
 
       if( $header->code =~ m/^1/ ) { # 1xx is not a final response
          $self->debug_printf( "HEADER [provisional] %s", $header->status_line );
-         $self->write( $request_body ) if $request_body and $expect_continue;
+         $self->write( $request_body,
+                       on_write => $on_body_write ) if $request_body and $expect_continue;
          return 1;
       }
 
@@ -455,14 +465,6 @@ sub request
    $stall_reason = "writing request";
 
    my $on_header_write = $stall_timer ? sub { $stall_timer->reset } : undef;
-   my $on_body_write;
-   if( $stall_timer or my $inner_on_body_write = $args{on_body_write} ) {
-      my $written = 0;
-      $on_body_write = sub {
-         $stall_timer->reset if $stall_timer;
-         $inner_on_body_write->( $written += $_[1] ) if $inner_on_body_write;
-      };
-   }
 
    $self->write( join( $CRLF, @headers ) .
                  $CRLF . $CRLF,
