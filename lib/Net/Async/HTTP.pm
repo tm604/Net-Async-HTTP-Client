@@ -66,32 +66,23 @@ C<Net::Async::HTTP> - use HTTP with C<IO::Async>
 
  $loop->add( $http );
 
- $http->do_request(
+ my ( $response ) = $http->do_request(
     uri => URI->new( "http://www.cpan.org/" ),
+ )->get;
 
-    on_response => sub {
-       my ( $response ) = @_;
-       print "Front page of http://www.cpan.org/ is:\n";
-       print $response->as_string;
-       $loop->loop_stop;
-    },
-
-    on_error => sub {
-       my ( $message ) = @_;
-       print "Cannot fetch http://www.cpan.org/ - $message\n";
-       $loop->loop_stop;
-    },
- );
-
- $loop->loop_forever;
+ print "Front page of http://www.cpan.org/ is:\n";
+ print $response->as_string;
 
 =head1 DESCRIPTION
 
 This object class implements an asynchronous HTTP user agent. It sends
-requests to servers, and invokes continuation callbacks when responses are
-received. The object supports multiple concurrent connections to servers, and
-allows multiple requests in the pipeline to any one connection. Normally, only
-one such object will be needed per program to support any number of requests.
+requests to servers, returning L<Future> instances to yield responses when
+they are received. The object supports multiple concurrent connections to
+servers, and allows multiple requests in the pipeline to any one connection.
+Normally, only one such object will be needed per program to support any
+number of requests.
+
+As well as using futures the module also supports a callback-based interface.
 
 This module optionally supports SSL connections, if L<IO::Async::SSL> is
 installed. If so, SSL can be requested either by passing a URI with the
@@ -226,14 +217,16 @@ more detail, see the documentation in L<IO::Async::Connector>.
 
 Optional. Affects the behaviour of response handling when a C<4xx> or C<5xx>
 response code is received. When false, these responses will be processed as
-other responses and passed to the C<on_response> callback, or used to set the
-successful result of the Future. When true, such an error response causes the
-C<on_error> handling or a failed Future instead. The HTTP response and request
-objects will be passed as well as the code and message.
+other responses and yielded as the result of the future, or passed to the
+C<on_response> callback. When true, such an error response causes the future
+to fail, or the C<on_error> callback to be invoked.
 
- $on_error->( "$code $message", $response, $request )
+The HTTP response and request objects will be passed as well as the code and
+message.
 
  ( $code_message, $response, $request ) = $f->failure
+
+ $on_error->( "$code $message", $response, $request )
 
 =item read_len => INT
 
@@ -387,11 +380,11 @@ sub get_connection
    return $f;
 }
 
-=head2 $http->do_request( %args )
+=head2 $http->do_request( %args ) ==> $response
 
-Send an HTTP request to a server, and set up the callbacks to receive a reply.
-The request may be represented by an L<HTTP::Request> object, or a L<URI>
-object, depending on the arguments passed.
+Send an HTTP request to a server, returning a L<Future> that will yield the
+response. The request may be represented by an L<HTTP::Request> object, or a
+L<URI> object, depending on the arguments passed.
 
 The following named arguments are used for C<HTTP::Request>s:
 
@@ -477,7 +470,45 @@ Optional. Override the hostname or port number implied by the URI.
 
 =back
 
-For either request type, it takes the following continuation callbacks:
+For either request type, it takes the following arguments:
+
+=over 8
+
+=item on_redirect => CODE
+
+Optional. A callback that is invoked if a redirect response is received,
+before the new location is fetched. It will be passed the response and the new
+URL.
+
+ $on_redirect->( $response, $location )
+
+=item on_body_write => CODE
+
+Optional. A callback that is invoked after each successful C<syswrite> of the
+body content. This may be used to implement an upload progress indicator or
+similar. It will be passed the total number of bytes of body content written
+so far (i.e. excluding bytes consumed in the header).
+
+ $on_body_write->( $written )
+
+=item max_redirects => INT
+
+Optional. How many levels of redirection to follow. If not supplied, will
+default to the value given in the constructor.
+
+=item timeout => NUM
+
+=item stall_timeout => NUM
+
+Optional. Overrides the object's configured timeout values for this one
+request. If not specified, will use the configured defaults.
+
+=back
+
+=head2 $http->do_request( %args )
+
+When not returning a future, the following extra arguments are used as
+callbacks instead:
 
 =over 8
 
@@ -514,42 +545,7 @@ well.
 
  $on_error->( $message, $response, $request )
 
-=item on_redirect => CODE
-
-Optional. A callback that is invoked if a redirect response is received,
-before the new location is fetched. It will be passed the response and the new
-URL.
-
- $on_redirect->( $response, $location )
-
-=item on_body_write => CODE
-
-Optional. A callback that is invoked after each successful C<syswrite> of the
-body content. This may be used to implement an upload progress indicator or
-similar. It will be passed the total number of bytes of body content written
-so far (i.e. excluding bytes consumed in the header).
-
- $on_body_write->( $written )
-
-=item max_redirects => INT
-
-Optional. How many levels of redirection to follow. If not supplied, will
-default to the value given in the constructor.
-
-=item timeout => NUM
-
-=item stall_timeout => NUM
-
-Optional. Overrides the object's configured timeout values for this one
-request. If not specified, will use the configured defaults.
-
 =back
-
-=head2 $future = $http->do_request( %args )
-
-This method also returns a L<Future>, which will eventually yield the (final
-non-redirect) C<HTTP::Response>. If returning a future, then the
-C<on_response>, C<on_header> and C<on_error> callbacks are optional.
 
 =cut
 
@@ -798,9 +794,9 @@ sub _make_request_for_uri
    return %args;
 }
 
-=head2 $future = $http->GET( $uri, %args )
+=head2 $http->GET( $uri, %args ) ==> $response
 
-=head2 $future = $http->HEAD( $uri, %args )
+=head2 $http->HEAD( $uri, %args ) ==> $response
 
 Convenient wrappers for using the C<GET> or C<HEAD> methods with a C<URI>
 object and few if any other arguments, returning a C<Future>.
