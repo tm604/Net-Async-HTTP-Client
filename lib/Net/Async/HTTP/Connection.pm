@@ -453,15 +453,25 @@ sub request
 
    $stall_timer->start if $stall_timer;
    $stall_reason = "writing request";
-   my $on_write = $stall_timer ? sub { $stall_timer->reset } : undef;
+
+   my $on_header_write = $stall_timer ? sub { $stall_timer->reset } : undef;
+   my $on_body_write;
+   if( $stall_timer or my $inner_on_body_write = $args{on_body_write} ) {
+      my $written = 0;
+      $on_body_write = sub {
+         $stall_timer->reset if $stall_timer;
+         $inner_on_body_write->( $written += $_[1] ) if $inner_on_body_write;
+      };
+   }
 
    $self->write( join( $CRLF, @headers ) .
-                 $CRLF . $CRLF .
-                 $req->content,
-                 on_write => $on_write );
+                 $CRLF . $CRLF,
+                 on_write => $on_header_write );
 
+   $self->write( $req->content,
+                 on_write => $on_body_write ) if length $req->content;
    $self->write( $request_body,
-                 on_write => $on_write ) if $request_body and !$expect_continue;
+                 on_write => $on_body_write ) if $request_body and !$expect_continue;
 
    $self->write( "", on_flush => sub {
       $stall_timer->reset;

@@ -522,6 +522,15 @@ URL.
 
  $on_redirect->( $response, $location )
 
+=item on_body_write => CODE
+
+Optional. A callback that is invoked after each successful C<syswrite> of the
+body content. This may be used to implement an upload progress indicator or
+similar. It will be passed the total number of bytes of body content written
+so far (i.e. excluding bytes consumed in the header).
+
+ $on_body_write->( $written )
+
 =item max_redirects => INT
 
 Optional. How many levels of redirection to follow. If not supplied, will
