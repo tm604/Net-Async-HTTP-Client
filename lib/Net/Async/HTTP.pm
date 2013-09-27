@@ -676,7 +676,7 @@ sub _do_request
             return Future->new->fail( "$code $message", $resp, $request );
          }
 
-         return $resp;
+         return $f;
       });
    }
 
