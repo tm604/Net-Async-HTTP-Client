@@ -107,7 +107,7 @@ local *IO::Async::Handle::connect = sub {
    wait_for { $future->is_ready };
 
    is( scalar $future->failure, "404 Not Found", '$future->failure for fail_on_error true' );
-   my ( undef, $response_f, $request_f ) = $future->failure;
+   my ( undef, undef, $response_f, $request_f ) = $future->failure;
 
    is( $response_f->code, 404, '$response_f->code for fail_on_error true' );
    is( $response_c->code, 404, '$response_c->code for fail_on_error true' );
