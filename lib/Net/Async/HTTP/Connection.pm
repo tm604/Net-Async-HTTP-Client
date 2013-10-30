@@ -222,8 +222,13 @@ sub request
       $self->add_child( $stall_timer );
       # Don't start it yet
 
-      $f->on_ready( sub { $self->remove_child( $stall_timer ); undef $stall_timer; } );
-      $f->on_cancel( sub { $self->remove_child( $stall_timer ); undef $stall_timer; } );
+      my $remove_timer = sub {
+         $self->remove_child( $stall_timer ) if $stall_timer;
+         undef $stall_timer;
+      };
+
+      $f->on_ready( $remove_timer );
+      $f->on_cancel( $remove_timer );
    }
 
    my $on_body_write;
