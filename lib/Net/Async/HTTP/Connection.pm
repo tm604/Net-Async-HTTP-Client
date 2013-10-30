@@ -222,8 +222,8 @@ sub request
       $self->add_child( $stall_timer );
       # Don't start it yet
 
-      $f->on_ready( sub { $self->remove_child( $stall_timer ) } );
-      $f->on_cancel( sub { $self->remove_child( $stall_timer ) } );
+      $f->on_ready( sub { $self->remove_child( $stall_timer ); undef $stall_timer; } );
+      $f->on_cancel( sub { $self->remove_child( $stall_timer ); undef $stall_timer; } );
    }
 
    my $on_body_write;
@@ -483,7 +483,7 @@ sub request
                  on_write => $on_body_write ) if $request_body and !$expect_continue;
 
    $self->write( "", on_flush => sub {
-      $stall_timer->reset;
+      $stall_timer->reset if $stall_timer; # test again in case it was cancelled in the meantime
       $stall_reason = "waiting for response";
    }) if $stall_timer;
 
