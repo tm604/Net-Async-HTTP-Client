@@ -319,6 +319,8 @@ sub request
          return sub {
             my ( $self, $buffref, $closed ) = @_;
 
+            $stall_timer->reset if $stall_timer;
+
             if( !defined $chunk_length and $$buffref =~ s/^(.*?)$CRLF// ) {
                my $header = $1;
 
@@ -395,6 +397,8 @@ sub request
          return sub {
             my ( $self, $buffref, $closed ) = @_;
 
+            $stall_timer->reset if $stall_timer;
+
             # This will truncate it if the server provided too much
             my $content = substr( $$buffref, 0, $content_length, "" );
 
@@ -423,6 +427,8 @@ sub request
          $stall_reason = "receiving body until EOF";
          return sub {
             my ( $self, $buffref, $closed ) = @_;
+
+            $stall_timer->reset if $stall_timer;
 
             $on_body_chunk->( $$buffref );
             $$buffref = "";
