@@ -21,12 +21,14 @@ use Net::Async::HTTP::Connection;
 
 use HTTP::Request;
 use HTTP::Request::Common qw();
+use URI;
 
 use IO::Async::Stream 0.59;
 use IO::Async::Loop 0.59; # ->connect( handle ) ==> $stream
 
 use Future::Utils 0.16 qw( repeat );
 
+use Scalar::Util qw( blessed );
 use Socket qw( SOCK_STREAM IPPROTO_IP IP_TOS );
 BEGIN {
    if( $Socket::VERSION >= '2.010' ) {
@@ -419,10 +421,10 @@ The following named arguments are used for C<URI> requests:
 
 =over 8
 
-=item uri => URI
+=item uri => URI or STRING
 
-A reference to a C<URI> object. If the scheme is C<https> then an SSL
-connection will be used.
+A reference to a C<URI> object, or a plain string giving the request URI. If
+the scheme is C<https> then an SSL connection will be used.
 
 =item method => STRING
 
@@ -761,7 +763,12 @@ sub _make_request_for_uri
    my $self = shift;
    my ( $uri, %args ) = @_;
 
-   ref $uri and $uri->isa( "URI" ) or croak "Expected 'uri' as a URI reference";
+   if( !ref $uri ) {
+      $uri = URI->new( $uri );
+   }
+   elsif( blessed $uri and !$uri->isa( "URI" ) ) {
+      croak "Expected 'uri' as a URI reference";
+   }
 
    my $method = delete $args{method} || "GET";
 
