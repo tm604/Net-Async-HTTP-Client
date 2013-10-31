@@ -817,21 +817,36 @@ sub _make_request_for_uri
 
 =head2 $http->HEAD( $uri, %args ) ==> $response
 
-Convenient wrappers for using the C<GET> or C<HEAD> methods with a C<URI>
-object and few if any other arguments, returning a C<Future>.
+=head2 $http->POST( $uri, $content, %args ) ==> $response
+
+Convenient wrappers for using the C<GET>, C<HEAD> or C<POST> methods with a
+C<URI> object and few if any other arguments, returning a C<Future>.
+
+Remember that C<POST> with non-form data (as indicated by a plain scalar
+instead of an C<ARRAY> reference of form data name/value pairs) needs a
+C<content_type> key in C<%args>.
 
 =cut
 
 sub GET
 {
    my $self = shift;
-   return $self->do_request( method => "GET", uri => @_ );
+   my ( $uri, @args ) = @_;
+   return $self->do_request( method => "GET", uri => $uri, @args );
 }
 
 sub HEAD
 {
    my $self = shift;
-   return $self->do_request( method => "HEAD", uri => @_ );
+   my ( $uri, @args ) = @_;
+   return $self->do_request( method => "HEAD", uri => $uri, @args );
+}
+
+sub POST
+{
+   my $self = shift;
+   my ( $uri, $content, @args ) = @_;
+   return $self->do_request( method => "POST", uri => $uri, content => $content, @args );
 }
 
 =head1 SUBCLASS METHODS
