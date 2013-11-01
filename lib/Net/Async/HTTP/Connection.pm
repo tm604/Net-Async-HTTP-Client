@@ -258,6 +258,8 @@ sub request
       }
 
       my $header = HTTP::Response->parse( $1 );
+      # HTTP::Response doesn't strip the \rs from this
+      ( my $status_line = $header->status_line ) =~ s/\r$//;
 
       unless( HTTP_MESSAGE_TRIMS_LWS ) {
          my @headers;
@@ -275,7 +277,7 @@ sub request
       }
 
       if( $header->code =~ m/^1/ ) { # 1xx is not a final response
-         $self->debug_printf( "HEADER [provisional] %s", $header->status_line );
+         $self->debug_printf( "HEADER [provisional] %s", $status_line );
          $self->write( $request_body,
                        on_write => $on_body_write ) if $request_body and $expect_continue;
          return 1;
@@ -284,7 +286,7 @@ sub request
       $header->request( $req );
       $header->previous( $args{previous_response} ) if $args{previous_response};
 
-      $self->debug_printf( "HEADER %s", $header->status_line );
+      $self->debug_printf( "HEADER %s", $status_line );
 
       my $on_body_chunk = $on_header->( $header );
 
