@@ -468,7 +468,15 @@ sub request
       my $uri = $req->uri;
       $path = $uri->path_query;
       $path = "/$path" unless $path =~ m{^/};
-      $headers->init_header( Host => $uri->authority );
+      my $authority = $uri->authority;
+      if( defined $authority and
+          my ( $user, $pass, $host ) = $authority =~ m/^(.*?):(.*)@(.*)$/ ) {
+         $headers->init_header( Host => $host );
+         $headers->authorization_basic( $user, $pass );
+      }
+      else {
+         $headers->init_header( Host => $authority );
+      }
    }
 
    my $protocol = $req->protocol || "HTTP/1.1";
