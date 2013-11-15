@@ -100,7 +100,7 @@ SKIP: {
 
    my $response = $f->get;
 
-   is( $response->content, $TEST_CONTENT, '$response->content is decompressed from gzip' );
+   is( $response->content, $TEST_CONTENT, '$response->content is decompressed from deflate' );
    ok( !defined $response->header( "Content-Encoding" ), '$response has no Content-Encoding' );
    is( $response->header( "X-Original-Content-Encoding" ), "deflate", '$response has X-Original-Content-Encoding' );
 }
