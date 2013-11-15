@@ -933,6 +933,10 @@ if( eval { require Compress::Raw::Zlib } ) {
    *decode_gzip    = sub { $make_zlib_decoder->( Compress::Raw::Zlib::WANT_GZIP() ) };
 }
 
+=back
+
+=cut
+
 =head1 EXAMPLES
 
 =head2 Concurrent GET
