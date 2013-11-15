@@ -905,7 +905,7 @@ The following content encoding types are recognised by these modules:
 
 =cut
 
-=item * gzip and deflate (q = 0.5)
+=item * gzip (q=0.7) and deflate (q=0.5)
 
 Recognised if L<Compress::Raw::Zlib> is installed.
 
@@ -934,7 +934,7 @@ if( eval { require Compress::Raw::Zlib } ) {
 
    # RFC1952
    __PACKAGE__->register_decoder(
-      gzip => 0.5, sub { $make_zlib_decoder->( Compress::Raw::Zlib::WANT_GZIP() ) },
+      gzip => 0.7, sub { $make_zlib_decoder->( Compress::Raw::Zlib::WANT_GZIP() ) },
    );
 }
 
@@ -973,10 +973,16 @@ the end of stream is reached, when it will be invoked with no arguments.
    sub can_decode
    {
       shift;
-      my ( $name ) = @_;
+      if( @_ ) {
+         my ( $name ) = @_;
 
-      return unless my $d = $DECODERS{$name};
-      return $d->[1]->();
+         return unless my $d = $DECODERS{$name};
+         return $d->[1]->();
+      }
+      else {
+         my @ds = sort { $DECODERS{$b}[0] <=> $DECODERS{$a}[0] } keys %DECODERS;
+         return join ", ", map { "$_;q=$DECODERS{$_}[0]" } @ds;
+      }
    }
 }
 

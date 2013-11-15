@@ -199,6 +199,11 @@ sub request
       $req->init_header( "Expect", "100-continue" );
    }
 
+   if( $self->{decode_content} ) {
+      #$req->init_header( "Accept-Encoding", Net::Async::HTTP->can_decode )
+      $req->init_header( "Accept-Encoding", "gzip" );
+   }
+
    my $f = $self->loop->new_future;
 
    # TODO: Cancelling a request Future shouldn't necessarily close the socket

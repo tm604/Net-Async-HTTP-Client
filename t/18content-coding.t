@@ -39,7 +39,7 @@ local *IO::Async::Handle::connect = sub {
 
 # RFC 2616 "gzip"
 SKIP: {
-   skip "Compress::Raw::Zlib not available", 3 unless eval { require Compress::Raw::Zlib };
+   skip "Compress::Raw::Zlib not available", 4 unless eval { require Compress::Raw::Zlib };
 
    my $f = $http->GET( "http://host/gzip" );
    $f->on_fail( sub { $f->get } );
@@ -47,6 +47,9 @@ SKIP: {
    {
       my $request_stream = "";
       wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
+
+      my ( undef, @headers ) = split m/$CRLF/, $request_stream;
+      ok( scalar( grep { m/^Accept-Encoding: / } @headers ), 'Request as an Accept-Encoding header' );
 
       my $compressor = Compress::Raw::Zlib::Deflate->new(
          -WindowBits => Compress::Raw::Zlib::WANT_GZIP(),
