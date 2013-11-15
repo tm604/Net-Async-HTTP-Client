@@ -905,7 +905,7 @@ The following content encoding types are recognised by these modules:
 
 =cut
 
-=item * gzip and deflate
+=item * gzip and deflate (q = 0.5)
 
 Recognised if L<Compress::Raw::Zlib> is installed.
 
@@ -928,14 +928,57 @@ if( eval { require Compress::Raw::Zlib } ) {
    };
 
    # RFC1950
-   *decode_deflate = sub { $make_zlib_decoder->( 15 ) };
+   __PACKAGE__->register_decoder(
+      deflate => 0.5, sub { $make_zlib_decoder->( 15 ) },
+   );
+
    # RFC1952
-   *decode_gzip    = sub { $make_zlib_decoder->( Compress::Raw::Zlib::WANT_GZIP() ) };
+   __PACKAGE__->register_decoder(
+      gzip => 0.5, sub { $make_zlib_decoder->( Compress::Raw::Zlib::WANT_GZIP() ) },
+   );
 }
 
 =back
 
+Other content encoding types can be registered by calling the following method
+
+=head2 Net::Async::HTTP->register_decoder( $name, $q, $make_decoder )
+
+Registers an encoding type called C<$name>, at the quality value C<$q>. In
+order to decode this encoding type, C<$make_decoder> will be invoked with no
+paramters, and expected to return a CODE reference to perform one instance of
+decoding.
+
+ $decoder = $make_decoder->()
+
+This decoder will be invoked on string buffers to decode them until
+the end of stream is reached, when it will be invoked with no arguments.
+
+ $content = $decoder->( $encoded_content )
+ $content = $decoder->() # EOS
+
 =cut
+
+{
+   my %DECODERS; # {$name} = [$q, $make_decoder]
+
+   sub register_decoder
+   {
+      shift;
+      my ( $name, $q, $make_decoder ) = @_;
+
+      $DECODERS{$name} = [ $q, $make_decoder ];
+   }
+
+   sub can_decode
+   {
+      shift;
+      my ( $name ) = @_;
+
+      return unless my $d = $DECODERS{$name};
+      return $d->[1]->();
+   }
+}
 
 =head1 EXAMPLES
 

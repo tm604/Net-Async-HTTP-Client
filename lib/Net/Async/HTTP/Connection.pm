@@ -292,13 +292,11 @@ sub request
 
       my $code = $header->code;
 
-      # Canonicalise the encoding into something we can safely use as a perl symbol name
-      my $content_encoding = lc $header->header( "Content-Encoding" );
-      $content_encoding =~ s/[^[:alnum:]]/_/g;
+      my $content_encoding = $header->header( "Content-Encoding" );
 
       my $decoder;
-      if( my $make_decoder = Net::Async::HTTP->can( "decode_$content_encoding" ) ) {
-         $decoder = $make_decoder->( $header );
+      if( $content_encoding and
+          $decoder = Net::Async::HTTP->can_decode( $content_encoding ) ) {
          $header->init_header( "X-Original-Content-Encoding" => $header->remove_header( "Content-Encoding" ) );
       }
 
