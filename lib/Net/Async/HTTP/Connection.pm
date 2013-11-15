@@ -372,8 +372,13 @@ sub request
                   $self->debug_printf( "BODY done" );
 
                   my $final;
+                  if( $decoder and not eval { $final = $decoder->(); 1 } ) {
+                     $self->debug_printf( "ERROR decode failed" );
+                     $f->fail( "Decode error $@", http => undef, $req );
+                     $self->close;
+                     return undef;
+                  }
                   $final = $decoder->() if $decoder;
-                  $on_body_chunk->( $final ) if defined $final;
 
                   $f->done( $on_body_chunk->() ) unless $f->is_cancelled;
                   $self->_request_done;
@@ -387,7 +392,12 @@ sub request
                my $chunk = substr( $$buffref, 0, $chunk_length, "" );
                undef $chunk_length;
 
-               $chunk = $decoder->( $chunk ) if $decoder;
+               if( $decoder and not eval { $chunk = $decoder->( $chunk ); 1 } ) {
+                  $self->debug_printf( "ERROR decode failed" );
+                  $f->fail( "Decode error $@", http => undef, $req );
+                  $self->close;
+                  return undef;
+               }
 
                unless( $$buffref =~ s/^$CRLF// ) {
                   $self->debug_printf( "ERROR chunk without CRLF" );
@@ -427,7 +437,12 @@ sub request
             my $content = substr( $$buffref, 0, $content_length, "" );
             $content_length -= length $content;
 
-            $content = $decoder->( $content ) if $decoder;
+            if( $decoder and not eval { $content = $decoder->( $content ); 1 } ) {
+               $self->debug_printf( "ERROR decode failed" );
+               $f->fail( "Decode error $@", http => undef, $req );
+               $self->close;
+               return undef;
+            }
 
             $on_body_chunk->( $content );
 
@@ -436,7 +451,12 @@ sub request
                $self->close if $connection_close;
 
                my $final;
-               $final = $decoder->() if $decoder;
+               if( $decoder and not eval { $final = $decoder->(); 1 } ) {
+                  $self->debug_printf( "ERROR decode failed" );
+                  $f->fail( "Decode error $@", http => undef, $req );
+                  $self->close;
+                  return undef;
+               }
                $on_body_chunk->( $final ) if defined $final;
 
                $f->done( $on_body_chunk->() ) unless $f->is_cancelled;
@@ -463,7 +483,12 @@ sub request
             my $content = $$buffref;
             $$buffref = "";
 
-            $content = $decoder->( $content ) if $decoder;
+            if( $decoder and not eval { $content = $decoder->( $content ); 1 } ) {
+               $self->debug_printf( "ERROR decode failed" );
+               $f->fail( "Decode error $@", http => undef, $req );
+               $self->close;
+               return undef;
+            }
 
             $on_body_chunk->( $content );
 
@@ -477,7 +502,12 @@ sub request
             $self->debug_printf( "BODY done" );
 
             my $final;
-            $final = $decoder->() if $decoder;
+            if( $decoder and not eval { $final = $decoder->(); 1 } ) {
+               $self->debug_printf( "ERROR decode failed" );
+               $f->fail( "Decode error $@", http => undef, $req );
+               $self->close;
+               return undef;
+            }
             $on_body_chunk->( $final ) if defined $final;
 
             $f->done( $on_body_chunk->() ) unless $f->is_cancelled;
