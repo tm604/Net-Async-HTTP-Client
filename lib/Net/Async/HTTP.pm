@@ -914,15 +914,15 @@ Recognised if L<Compress::Raw::Zlib> is installed.
 if( eval { require Compress::Raw::Zlib } ) {
    my $make_zlib_decoder = sub {
       my ( $bits ) = @_;
-      my $inflater = Compress::Raw::Zlib::Inflate->new(
+      my $inflator = Compress::Raw::Zlib::Inflate->new(
          -ConsumeInput => 0,
          -WindowBits => $bits,
       );
       sub {
          my $output;
-         my $status = @_ ? $inflater->inflate( $_[0], $output )
-                         : $inflater->inflate( "", $output, 1 );
-         die "Decode error: $status" if $status && $status != Compress::Raw::Zlib::Z_STREAM_END();
+         my $status = @_ ? $inflator->inflate( $_[0], $output )
+                         : $inflator->inflate( "", $output, 1 );
+         die "$status\n" if $status && $status != Compress::Raw::Zlib::Z_STREAM_END();
          return $output;
       };
    };
@@ -935,6 +935,26 @@ if( eval { require Compress::Raw::Zlib } ) {
    # RFC1952
    __PACKAGE__->register_decoder(
       gzip => 0.7, sub { $make_zlib_decoder->( Compress::Raw::Zlib::WANT_GZIP() ) },
+   );
+}
+
+=item * bzip2 (q=0.8)
+
+Recognised if L<Compress::Bzip2> is installed.
+
+=cut
+
+if( eval { require Compress::Bzip2 } ) {
+   __PACKAGE__->register_decoder(
+      bzip2 => 0.8, sub {
+         my $inflator = Compress::Bzip2::inflateInit();
+         sub {
+            return unless my ( $in ) = @_;
+            my $out = $inflator->bzinflate( \$in );
+            die $inflator->bzerror."\n" if !defined $out;
+            return $out;
+         };
+      }
    );
 }
 

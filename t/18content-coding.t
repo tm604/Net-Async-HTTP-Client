@@ -108,4 +108,39 @@ SKIP: {
    is( $response->header( "X-Original-Content-Encoding" ), "deflate", '$response has X-Original-Content-Encoding' );
 }
 
+SKIP: {
+   skip "Compress::Bzip2 not available", 3 unless eval { require Compress::Bzip2 };
+
+   my $f = $http->GET( "http://host/bzip2" );
+   $f->on_fail( sub { $f->get } );
+
+   {
+      my $request_stream = "";
+      wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
+
+      my $compressor = Compress::Bzip2::bzdeflateInit();
+      my $content = "";
+      $content .= $compressor->bzdeflate( my $tmp = $TEST_CONTENT );
+      $content .= $compressor->bzclose;
+
+      {
+         open my $fh, ">", "content.bz2";
+         print $fh $content;
+      }
+
+      $peersock->syswrite( sprintf "HTTP/1.1 200 OK$CRLF" .
+         "Content-Length: %d$CRLF" .
+         "Content-Type: text/plain$CRLF" .
+         "Content-Encoding: bzip2$CRLF" .
+         $CRLF . "%s",
+         length $content, $content );
+   }
+
+   my $response = $f->get;
+
+   is( $response->content, $TEST_CONTENT, '$response->content is decompressed from bzip2' );
+   ok( !defined $response->header( "Content-Encoding" ), '$response has no Content-Encoding' );
+   is( $response->header( "X-Original-Content-Encoding" ), "bzip2", '$response has X-Original-Content-Encoding' );
+}
+
 done_testing;
