@@ -53,7 +53,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( pipeline max_in_flight ready_queue )) {
+   foreach (qw( pipeline max_in_flight ready_queue decode_content )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -292,6 +292,16 @@ sub request
 
       my $code = $header->code;
 
+      # Canonicalise the encoding into something we can safely use as a perl symbol name
+      my $content_encoding = lc $header->header( "Content-Encoding" );
+      $content_encoding =~ s/[^[:alnum:]]/_/g;
+
+      my $decoder;
+      if( my $make_decoder = Net::Async::HTTP->can( "decode_$content_encoding" ) ) {
+         $decoder = $make_decoder->( $header );
+         $header->init_header( "X-Original-Content-Encoding" => $header->remove_header( "Content-Encoding" ) );
+      }
+
       # can_pipeline is set for HTTP/1.1 or above; presume it can keep-alive if set
       my $connection_close = lc( $header->header( "Connection" ) || ( $self->{can_pipeline} ? "keep-alive" : "close" ) )
                               eq "close";
@@ -360,6 +370,11 @@ sub request
                   # TODO: Actually use the trailer
 
                   $self->debug_printf( "BODY done" );
+
+                  my $final;
+                  $final = $decoder->() if $decoder;
+                  $on_body_chunk->( $final ) if defined $final;
+
                   $f->done( $on_body_chunk->() ) unless $f->is_cancelled;
                   $self->_request_done;
                   return undef; # Finished
@@ -371,6 +386,8 @@ sub request
                # Chunk body
                my $chunk = substr( $$buffref, 0, $chunk_length, "" );
                undef $chunk_length;
+
+               $chunk = $decoder->( $chunk ) if $decoder;
 
                unless( $$buffref =~ s/^$CRLF// ) {
                   $self->debug_printf( "ERROR chunk without CRLF" );
@@ -408,14 +425,20 @@ sub request
 
             # This will truncate it if the server provided too much
             my $content = substr( $$buffref, 0, $content_length, "" );
+            $content_length -= length $content;
+
+            $content = $decoder->( $content ) if $decoder;
 
             $on_body_chunk->( $content );
-
-            $content_length -= length $content;
 
             if( $content_length == 0 ) {
                $self->debug_printf( "BODY done" );
                $self->close if $connection_close;
+
+               my $final;
+               $final = $decoder->() if $decoder;
+               $on_body_chunk->( $final ) if defined $final;
+
                $f->done( $on_body_chunk->() ) unless $f->is_cancelled;
                $self->_request_done;
                return undef;
@@ -437,8 +460,12 @@ sub request
 
             $stall_timer->reset if $stall_timer;
 
-            $on_body_chunk->( $$buffref );
+            my $content = $$buffref;
             $$buffref = "";
+
+            $content = $decoder->( $content ) if $decoder;
+
+            $on_body_chunk->( $content );
 
             return 0 unless $closed;
 
@@ -448,6 +475,11 @@ sub request
             $self->close;
 
             $self->debug_printf( "BODY done" );
+
+            my $final;
+            $final = $decoder->() if $decoder;
+            $on_body_chunk->( $final ) if defined $final;
+
             $f->done( $on_body_chunk->() ) unless $f->is_cancelled;
             # $self already closed
             $self->_request_done;

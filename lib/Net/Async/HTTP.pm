@@ -245,6 +245,14 @@ should either be a C<IPTOS_*> constant, or one of the string names
 C<lowdelay>, C<throughput>, C<reliability> or C<mincost>. If undefined or left
 absent, no option will be set.
 
+=item decode_content => BOOL
+
+Optional. If true, incoming responses that have a recognised
+C<Content-Encoding> are handled by the module, and decompressed content is
+passed to the body handling callback or returned in the C<HTTP::Response>. See
+L</CONTENT DECODING> below for details of which encoding methods are
+recognised.
+
 =back
 
 =cut
@@ -257,7 +265,7 @@ sub configure
    foreach (qw( user_agent max_redirects max_in_flight max_connections_per_host
       timeout stall_timeout proxy_host proxy_port cookie_jar pipeline
       local_host local_port local_addrs local_addr fail_on_error
-      read_len write_len ))
+      read_len write_len decode_content ))
    {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
@@ -350,11 +358,9 @@ sub get_connection
    if( !$self->{max_connections_per_host} or @$conns < $self->{max_connections_per_host} ) {
       my $conn = Net::Async::HTTP::Connection->new(
          notifier_name => "$host:$port",
-         max_in_flight => $self->{max_in_flight},
-         pipeline      => $self->{pipeline},
          ready_queue   => $ready_queue,
-         read_len      => $self->{read_len},
-         write_len     => $self->{write_len},
+         ( map { $_ => $self->{$_} }
+            qw( max_in_flight pipeline read_len write_len decode_content ) ),
 
          on_closed => sub {
             my $conn = shift;
@@ -886,6 +892,45 @@ sub process_response
    my ( $response ) = @_;
 
    $self->{cookie_jar}->extract_cookies( $response ) if $self->{cookie_jar};
+}
+
+=head1 CONTENT DECODING
+
+If the required decompression modules are installed and available, compressed
+content can be decoded.
+
+The following content encoding types are recognised by these modules:
+
+=over 4
+
+=cut
+
+=item * gzip and deflate
+
+Recognised if L<Compress::Raw::Zlib> is installed.
+
+=cut
+
+if( eval { require Compress::Raw::Zlib } ) {
+   my $make_zlib_decoder = sub {
+      my ( $bits ) = @_;
+      my $inflater = Compress::Raw::Zlib::Inflate->new(
+         -ConsumeInput => 0,
+         -WindowBits => $bits,
+      );
+      sub {
+         my $output;
+         my $status = @_ ? $inflater->inflate( $_[0], $output )
+                         : $inflater->inflate( "", $output, 1 );
+         die "Decode error: $status" if $status && $status != Compress::Raw::Zlib::Z_STREAM_END();
+         return $output;
+      };
+   };
+
+   # RFC1950
+   *decode_deflate = sub { $make_zlib_decoder->( 15 ) };
+   # RFC1952
+   *decode_gzip    = sub { $make_zlib_decoder->( Compress::Raw::Zlib::WANT_GZIP() ) };
 }
 
 =head1 EXAMPLES
