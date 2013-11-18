@@ -107,11 +107,22 @@ sub ready
 
    if( $self->should_pipeline ) {
       $self->debug_printf( "READY pipelined" );
-      ( shift @$queue )->done( $self ) while @$queue && $self->should_pipeline;
+      while( @$queue && $self->should_pipeline ) {
+         my $f = shift @$queue;
+         next if $f->is_cancelled;
+
+         $f->done( $self );
+      }
    }
    elsif( @$queue and $self->is_idle ) {
       $self->debug_printf( "READY non-pipelined" );
-      ( shift @$queue )->done( $self );
+      while( @$queue ) {
+         my $f = shift @$queue;
+         next if $f->is_cancelled;
+
+         $f->done( $self );
+         last;
+      }
    }
    else {
       $self->debug_printf( "READY cannot-run queue=%d idle=%s",
