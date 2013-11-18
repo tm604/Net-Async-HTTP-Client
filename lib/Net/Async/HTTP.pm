@@ -378,7 +378,7 @@ sub get_connection
          on_error => sub {
             my $conn = shift;
 
-            $f->fail( @_ );
+            $f->fail( @_ ) unless $f->is_cancelled;
 
             @$conns = grep { $_ != $conn } @$conns;
             @$ready_queue = grep { $_ != $f } @$ready_queue;
