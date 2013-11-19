@@ -251,7 +251,12 @@ Optional. If true, incoming responses that have a recognised
 C<Content-Encoding> are handled by the module, and decompressed content is
 passed to the body handling callback or returned in the C<HTTP::Response>. See
 L</CONTENT DECODING> below for details of which encoding methods are
-recognised.
+recognised. When this option is enabled, outgoing requests also have the
+C<Accept-Encoding> header added to them if it does not already exist.
+
+Currently the default is false, because this behaviour is new, but it may
+default to true in a later version. Applications which care which behaviour
+applies should set this to a defined value to ensure it doesn't change.
 
 =back
 
