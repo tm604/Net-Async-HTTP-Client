@@ -902,7 +902,12 @@ sub process_response
 =head1 CONTENT DECODING
 
 If the required decompression modules are installed and available, compressed
-content can be decoded.
+content can be decoded. If the received C<Content-Encoding> is recognised and
+the required module is available, the content is transparently decoded and the
+decoded content is returned in the resulting response object, or passed to the
+data chunk handler. In this case, the original C<Content-Encoding> header will
+be deleted from the response, and its value will be available instead as
+C<X-Original-Content-Encoding>.
 
 The following content encoding types are recognised by these modules:
 
