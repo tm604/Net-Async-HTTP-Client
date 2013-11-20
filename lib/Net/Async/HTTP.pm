@@ -1064,7 +1064,7 @@ Parts of this code were paid for by
 
 =item *
 
-Socialflow L<http://www.socialflow.com>
+SocialFlow L<http://www.socialflow.com>
 
 =item *
 
