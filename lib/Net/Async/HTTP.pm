@@ -917,11 +917,11 @@ The following content encoding types are recognised by these modules:
 
 =item * gzip (q=0.7) and deflate (q=0.5)
 
-Recognised if L<Compress::Raw::Zlib> is installed.
+Recognised if L<Compress::Raw::Zlib> version 2.057 or newer is installed.
 
 =cut
 
-if( eval { require Compress::Raw::Zlib } ) {
+if( eval { require Compress::Raw::Zlib and $Compress::Raw::Zlib::VERSION >= 2.057 } ) {
    my $make_zlib_decoder = sub {
       my ( $bits ) = @_;
       my $inflator = Compress::Raw::Zlib::Inflate->new(

@@ -17,7 +17,7 @@ my $build = Module::Build->new(
       'URI' => 0,
    },
    recommends => {
-      'Compress::Raw::Zlib' => 0,
+      'Compress::Raw::Zlib' => '2.057', # Fails with Compress::Raw::Zlib 2.056 or before
    },
    build_requires => {
       'HTTP::Cookies' => 0,
