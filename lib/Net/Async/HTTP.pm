@@ -26,6 +26,7 @@ use URI;
 use IO::Async::Stream 0.59;
 use IO::Async::Loop 0.59; # ->connect( handle ) ==> $stream
 
+use Future 0.21; # ->then_with_f
 use Future::Utils 0.16 qw( repeat );
 
 use Scalar::Util qw( blessed );
@@ -683,9 +684,8 @@ sub _do_request
    } );
 
    if( $self->{fail_on_error} ) {
-      $future = $future->and_then( sub {
-         my $f = shift;
-         my $resp = $f->get;
+      $future = $future->then_with_f( sub {
+         my ( $f, $resp ) = @_;
          my $code = $resp->code;
 
          if( $code =~ m/^[45]/ ) {
