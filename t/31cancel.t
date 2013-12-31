@@ -16,6 +16,8 @@ testing_loop( $loop );
 
 my $http = Net::Async::HTTP->new(
    user_agent => "", # Don't put one in request headers
+   pipeline => 1,
+   max_connections_per_host => 1,
 );
 
 $loop->add( $http );
@@ -72,6 +74,51 @@ local *IO::Async::Handle::connect = sub {
 
    wait_for { $f2->is_ready };
    $f2->get;
+}
+
+# Cancelling a pending unpipelined request
+{
+   undef $peersock;
+   my ( $f1, $f2, $f3 ) = map {
+      $http->do_request(
+         method  => "GET",
+         uri     => URI->new( "http://host2/req/$_" ),
+      );
+   } 1, 2, 3;
+
+   wait_for { $peersock };
+
+   # cancel $f2 - 1 and 3 should still complete
+   $f2->cancel;
+
+   # Wait for the $f1 and $f3
+   my $request_stream = "";
+
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
+
+   like( $request_stream, qr(^GET /req/1 HTTP/1.1), '$f1 request written' );
+   $request_stream = "";
+
+   $peersock->syswrite( join( $CRLF,
+      "HTTP/1.1 200 OK",
+      "Content-Length: 0",
+      "" ) . $CRLF
+   );
+
+   wait_for { $f1->is_ready };
+
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
+
+   like( $request_stream, qr(^GET /req/3 HTTP/1.1), '$f3 request written' );
+   $request_stream = "";
+
+   $peersock->syswrite( join( $CRLF,
+      "HTTP/1.1 200 OK",
+      "Content-Length: 0",
+      "" ) . $CRLF
+   );
+
+   wait_for { $f3->is_ready };
 }
 
 done_testing;
