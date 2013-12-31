@@ -79,6 +79,24 @@ local *IO::Async::Handle::connect = sub {
 # Cancelling a pending unpipelined request
 {
    undef $peersock;
+
+   # Make first -one- request/response to establish HTTP/1.1 pipeline ability
+   my $f0 = $http->do_request(
+      method => "GET",
+      uri    => URI->new( "http://host2/" ),
+   );
+
+   my $request_stream = "";
+   wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
+
+   $peersock->syswrite( join( $CRLF,
+      "HTTP/1.1 200 OK",
+      "Content-Length: 0",
+      "" ) . $CRLF
+   );
+
+   wait_for { $f0->is_ready };
+
    my ( $f1, $f2, $f3 ) = map {
       $http->do_request(
          method  => "GET",
@@ -92,8 +110,7 @@ local *IO::Async::Handle::connect = sub {
    $f2->cancel;
 
    # Wait for the $f1 and $f3
-   my $request_stream = "";
-
+   $request_stream = "";
    wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
 
    like( $request_stream, qr(^GET /req/1 HTTP/1.1), '$f1 request written' );
@@ -106,6 +123,7 @@ local *IO::Async::Handle::connect = sub {
    );
 
    wait_for { $f1->is_ready };
+   ok( $f1->is_done, '$f1 is done' );
 
    wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
 
@@ -119,6 +137,7 @@ local *IO::Async::Handle::connect = sub {
    );
 
    wait_for { $f3->is_ready };
+   ok( $f3->is_done, '$f3 is done' );
 }
 
 done_testing;
