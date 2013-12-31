@@ -525,6 +525,11 @@ default to the value given in the constructor.
 Optional. Overrides the object's configured timeout values for this one
 request. If not specified, will use the configured defaults.
 
+On a timeout, the returned future will fail with either C<timeout> or
+C<stall_timeout> as the operation name.
+
+ ( $message, "timeout" ) = $f->failure
+
 =back
 
 =head2 $http->do_request( %args )
@@ -741,7 +746,7 @@ sub do_request
       $future = Future->wait_any(
          $future,
          $self->loop->timeout_future( after => $timeout )
-                    ->transform( fail => sub { "Timed out", http => undef, $request } ),
+                    ->transform( fail => sub { "Timed out", timeout => } ),
       );
    }
 
@@ -753,7 +758,7 @@ sub do_request
 
    $future->on_fail( sub {
       my ( $message, $name, @rest ) = @_;
-      $args{on_error}->( $message, @rest ) if $name eq "http"
+      $args{on_error}->( $message, @rest );
    }) if $args{on_error};
 
    # DODGY HACK:

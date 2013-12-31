@@ -232,7 +232,7 @@ sub request
 
             $self->parent->close_now;
 
-            $f->fail( "Stalled while $stall_reason", http => undef, $req );
+            $f->fail( "Stalled while $stall_reason", stall_timeout => );
          }
       );
       $self->add_child( $stall_timer );
