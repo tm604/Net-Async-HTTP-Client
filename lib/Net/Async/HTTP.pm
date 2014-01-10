@@ -331,6 +331,10 @@ sub connect_connection
       %args,
    )->on_done( sub {
       my ( $stream ) = @_;
+      $stream->configure(
+         notifier_name => "$host:$port,fd=" . $stream->read_handle->fileno,
+      );
+
       # Defend against ->setsockopt doing silly things like detecting SvPOK()
       $stream->read_handle->setsockopt( IPPROTO_IP, IP_TOS, $self->{ip_tos}+0 ) if defined $self->{ip_tos};
    })->on_fail( sub {
@@ -363,7 +367,7 @@ sub get_connection
 
    if( !$self->{max_connections_per_host} or @$conns < $self->{max_connections_per_host} ) {
       my $conn = Net::Async::HTTP::Connection->new(
-         notifier_name => "$host:$port",
+         notifier_name => "$host:$port,connecting",
          ready_queue   => $ready_queue,
          ( map { $_ => $self->{$_} }
             qw( max_in_flight pipeline read_len write_len decode_content ) ),
