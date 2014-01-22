@@ -125,11 +125,6 @@ SKIP: {
       $content .= $compressor->bzdeflate( my $tmp = $TEST_CONTENT );
       $content .= $compressor->bzclose;
 
-      {
-         open my $fh, ">", "content.bz2";
-         print $fh $content;
-      }
-
       $peersock->syswrite( sprintf "HTTP/1.1 200 OK$CRLF" .
          "Content-Length: %d$CRLF" .
          "Content-Type: text/plain$CRLF" .
