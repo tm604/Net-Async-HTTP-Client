@@ -40,7 +40,7 @@ local *IO::Async::Handle::connect = sub {
    my @f = map { $http->do_request(
       request => HTTP::Request->new( GET => "/$_", [ Host => $host ] ),
       host    => $host,
-   ) } 1 .. 2;
+   ) } 1 .. 3;
 
    my $request_stream = "";
    wait_for_stream { $request_stream =~ m/$CRLF$CRLF/ } $peersock => $request_stream;
@@ -50,10 +50,11 @@ local *IO::Async::Handle::connect = sub {
    $peersock->print( "HTTP/1.1 200 OK$CRLF" .
                      "Content-Length: 0$CRLF" .
                      $CRLF );
-   $peersock->close;
 
    wait_for { $f[0]->is_ready };
    ok( !$f[0]->failure, 'First request succeeds before EOF' );
+
+   $peersock->close;
 
    wait_for { $f[1]->is_ready };
    ok( $f[1]->failure, 'Second request fails after EOF' );
@@ -61,6 +62,9 @@ local *IO::Async::Handle::connect = sub {
    # Not sure which error will happen
    like( scalar $f[1]->failure, qr/^Connection closed($| while awaiting header)/,
       'Queued request gets connection closed error' );
+
+   wait_for { $f[2]->is_ready };
+   ok( $f[2]->failure );
 }
 
 done_testing;
