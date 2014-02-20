@@ -265,6 +265,8 @@ sub request
    my $on_read = sub {
       my ( $self, $buffref, $closed, $responder ) = @_;
 
+      Scalar::Util::weaken($responder);
+
       if( $stall_timer ) {
          $stall_reason = "receiving response header";
          $stall_timer->reset;
