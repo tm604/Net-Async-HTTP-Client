@@ -396,6 +396,11 @@ sub get_connection
             if( @$ready_queue ) {
                # Requeue another connection attempt as there's still more to do
                $self->get_connection( %args, future => $ready_queue->[0] );
+            } else {
+               # Nothing was ready, we're no longer listed as an available connection,
+               # all that's left to do now is remove the notifier so we don't hang
+               # around taking up memory.
+               $self->remove_child( $conn );
             }
          },
       );
